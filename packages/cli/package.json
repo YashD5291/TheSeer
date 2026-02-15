@@ -1,0 +1,11 @@
+{
+  "name": "@the-seer/cli",
+  "version": "0.1.0",
+  "type": "module",
+  "dependencies": {
+    "@the-seer/core": "workspace:*"
+  },
+  "devDependencies": {
+    "typescript": "^5.7.0"
+  }
+}

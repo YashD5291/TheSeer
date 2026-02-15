@@ -1,0 +1,33 @@
+Staff ML Engineer, Applied AI
+TIFIN
+Boulder, CO, Charlotte, NC or Remote
+$190,000 - $225,000 USD
+
+ROLE OVERVIEW
+
+As a Staff ML Engineer on the Applied AI team, you will own and lead projects across our various generative AI product lines. We are looking for individuals who have worked end-to-end and have experience building generative AI products where LLMs are a core component. Expertise with fine-tuning and reinforcement learning is critical. This is an individual contributor and technical leadership role reporting into the Head of AI.
+
+PROJECTS
+
+AI Agent Orchestrator: Multi-agent systems that automate tasks and streamline workflows, driving measurable improvements in operational efficiency.
+Human-in-the-Loop Collaboration: AI-powered co-pilot for advisors and other user personas, streamlining workflows across business workflows such as prospecting, conversion, onboarding, and client servicing.
+Fine-Tuned Models: Purpose-tuned models for financial services to handle complex, multi-turn interactions with actionability in low-latency environments.
+Seamless Legacy Tech Integration: Designed to navigate and optimize legacy systems for streamlined operations with computer use models.
+
+WHAT YOU'LL DO
+
+Design and fine-tune open source and proprietary LLMs for various tasks such as answering questions, summarization, reasoning and planning, etc.
+Build advanced Retrieval Augmented Generation (RAG) pipeline including rewriting, embedding fine-tuning, hybrid search, reranking, knowledge graphs, etc.
+Experience shipping generative AI products powered by LLMs: designing and implementing agentic workflows and multi-agent systems that enable autonomous AI behaviors, leveraging the latest state-of-the-art research
+Apply reinforcement learning techniques including reinforcement learning fine tuning (e.g., PPO, DPO, GRPO) to continuously optimize model performance.
+Implement a comprehensive evaluation framework and metrics for model performance
+Deploy models into production environments and ensure low latency, reliability, and scalability.
+Collaborate with product team and software engineering team to build end-to-end product systems.
+
+WHAT YOU'LL BRING
+
+5+ years of experience (post-BS/MS) in applied AI/ML engineering
+Experience shipping generative AI products powered by LLMs: designing and implementing agentic workflows that enable autonomous AI behaviors, leveraging the latest state-of-the-art research
+Hands-on experience in various LLM fine-tuning techniques (e.g. LORA), LLM inference frameworks (e.g. vLLM), advanced RAG pipelines
+Solid expertise in reinforcement learning fine tuning methodologies and frameworks to optimize AI models
+Resilience and adaptability - experience working at early-stage startups is a plus
