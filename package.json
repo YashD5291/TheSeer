@@ -5,7 +5,7 @@
   "scripts": {
     "build": "turbo build",
     "dev": "turbo dev",
-    "seer": "tsx packages/cli/src/index.ts"
+    "seer": "node --env-file=.env --import=tsx packages/cli/src/index.ts"
   },
   "devDependencies": {
     "turbo": "^2.4.0",

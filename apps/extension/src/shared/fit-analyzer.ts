@@ -1,67 +1,19 @@
-import { GoogleGenerativeAI } from '@google/generative-ai';
+import { callGemini } from './gemini-client.js';
 import type { JobData, ParsedProfile, FitAnalysis, BaseResumeSlug } from './types.js';
 
-const MODELS = [
-  'gemini-2.5-flash',
-  'gemini-2.0-flash',
-];
-
-async function callGemini(apiKey: string, prompt: string): Promise<string> {
-  const genAI = new GoogleGenerativeAI(apiKey);
-  let lastError: any;
-
-  // Try each model
-  for (const modelName of MODELS) {
-    try {
-      const model = genAI.getGenerativeModel({ model: modelName });
-      const result = await model.generateContent(prompt);
-      return result.response.text();
-    } catch (err: any) {
-      lastError = err;
-      const is429 = err?.message?.includes('429') || err?.status === 429;
-
-      if (is429) {
-        console.log(`  [${modelName}] quota exceeded, trying next model...`);
-        continue;
-      }
-
-      throw err;
-    }
-  }
-
-  // All models 429'd — extract retry delay and wait
-  const retryMatch = lastError?.message?.match(/retry in ([\d.]+)s/i);
-  const waitSec = retryMatch ? Math.ceil(parseFloat(retryMatch[1])) + 2 : 20;
-  console.log(`  All models rate-limited. Waiting ${waitSec}s before retry...`);
-  await new Promise(r => setTimeout(r, waitSec * 1000));
-
-  // Check if it's a daily quota (limit: 0) vs per-minute rate limit
-  const isDailyExhausted = lastError?.message?.includes('limit: 0');
-  if (isDailyExhausted) {
-    throw new Error(
-      'Gemini free tier daily quota exhausted. Options:\n' +
-      '  1. Wait for daily reset (midnight Pacific time)\n' +
-      '  2. Create a new API key from a different project at https://ai.google.dev/gemini-api\n' +
-      '  3. Enable billing on your Google Cloud project for higher limits'
-    );
-  }
-
-  // Per-minute rate limit — retry after delay
-  const model = genAI.getGenerativeModel({ model: MODELS[0] });
-  const result = await model.generateContent(prompt);
-  return result.response.text();
+export interface DeepFitResult {
+  analysis: FitAnalysis;
+  model: string;
 }
 
 export async function deepFitAnalysis(
   job: JobData,
   profile: ParsedProfile,
   baseResumeSummaries: Record<BaseResumeSlug, string>,
-  apiKeyOverride?: string
-): Promise<FitAnalysis> {
-
-  const apiKey = apiKeyOverride || process.env.GEMINI_API_KEY;
+  apiKey: string
+): Promise<DeepFitResult> {
   if (!apiKey) {
-    throw new Error('GEMINI_API_KEY environment variable is not set. Get a free key at https://ai.google.dev/gemini-api');
+    throw new Error('Gemini API key not configured. Go to extension Options to set it.');
   }
 
   const prompt = `You are The Seer, an expert resume strategist and job market analyst.
@@ -117,14 +69,13 @@ ${job.nice_to_haves.length > 0 ? `Nice to have:\n${job.nice_to_haves.map(r => `-
   "apply_recommendation": "<strong_yes|yes|maybe|no>"
 }`;
 
-  const text = await callGemini(apiKey, prompt);
-
-  // Clean potential markdown code fences
+  const { text, model } = await callGemini(apiKey, prompt);
   const cleaned = text.replace(/```json\n?|\n?```/g, '').trim();
 
   try {
-    return JSON.parse(cleaned) as FitAnalysis;
+    const analysis = JSON.parse(cleaned) as FitAnalysis;
+    return { analysis, model };
   } catch (e) {
-    throw new Error(`Failed to parse Gemini response as JSON:\n${cleaned}\n\nError: ${e}`);
+    throw new Error(`Failed to parse Gemini response: ${e}`);
   }
 }

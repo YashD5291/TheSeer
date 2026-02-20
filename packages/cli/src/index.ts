@@ -5,7 +5,7 @@ import { quickFitCheck } from '@the-seer/core/quick-fit';
 import { deepFitAnalysis } from '@the-seer/core/fit-analyzer';
 import { buildClaudePrompt } from '@the-seer/core/prompt-builder';
 import { CONFIG, getDataPath } from '@the-seer/core/config';
-import type { JobData, BaseResumeSlug } from '@the-seer/core/types';
+import type { JobData, FitAnalysis, BaseResumeSlug } from '@the-seer/core/types';
 
 // ─── Load data files ────────────────────────────────────────────────
 
@@ -85,7 +85,9 @@ function parseJDFile(filePath: string): JobData {
 // ─── CLI Commands ───────────────────────────────────────────────────
 
 const command = process.argv[2];
-const jdPath = process.argv[3];
+const args = process.argv.slice(3);
+const jdPath = args.find(a => !a.startsWith('--'));
+const dryRun = args.includes('--dry-run');
 
 async function main() {
   // Parse profile from files
@@ -162,17 +164,44 @@ async function main() {
 
     case 'prompt': {
       if (!jdPath) {
-        console.log('Usage: pnpm seer prompt ./jd.txt');
+        console.log('Usage: pnpm seer prompt ./jd.txt [--dry-run]');
         return;
       }
       const job = parseJDFile(jdPath);
 
-      // Step 1: Run Gemini analysis
-      console.log('\n=== THE SEER — Full Prompt Generation ===\n');
-      console.log(`Job: ${job.title} @ ${job.company}`);
-      console.log('Running Gemini analysis...');
+      let analysis: FitAnalysis;
 
-      const analysis = await deepFitAnalysis(job, profile, CONFIG.baseResumeSummaries);
+      if (dryRun) {
+        console.log('\n=== THE SEER — Prompt Generation (DRY RUN) ===\n');
+        console.log(`Job: ${job.title} @ ${job.company}`);
+
+        // Quick fit to pick a reasonable base
+        const quick = quickFitCheck(job, profile);
+        console.log(`Quick fit: ${quick.score}/100`);
+
+        // Mock analysis using quick-fit data
+        analysis = {
+          fit_score: quick.score,
+          confidence: 70,
+          recommended_base: 'gen_ai', // default for dry run
+          base_reasoning: 'Dry run - defaulting to gen_ai base',
+          key_matches: quick.matched,
+          gaps: [],
+          gap_mitigation: [],
+          tailoring_priorities: ['Emphasize matched skills from quick-fit'],
+          ats_keywords: quick.matched.slice(0, 10),
+          red_flags: [],
+          estimated_competition: 'medium',
+          apply_recommendation: quick.pass ? 'yes' : 'maybe',
+        };
+      } else {
+        // Step 1: Run Gemini analysis
+        console.log('\n=== THE SEER — Full Prompt Generation ===\n');
+        console.log(`Job: ${job.title} @ ${job.company}`);
+        console.log('Running Gemini analysis...');
+
+        analysis = await deepFitAnalysis(job, profile, CONFIG.baseResumeSummaries);
+      }
 
       console.log(`\nBase selected: ${analysis.recommended_base} (score: ${analysis.fit_score}/100)`);
       console.log(`Apply recommendation: ${analysis.apply_recommendation}`);
@@ -271,6 +300,34 @@ async function main() {
       break;
     }
 
+    case 'export': {
+      const outDir = getDataPath('output');
+      if (!fs.existsSync(outDir)) fs.mkdirSync(outDir, { recursive: true });
+
+      const exportData = {
+        profile,
+        baseResumeSummaries: CONFIG.baseResumeSummaries,
+        prompts: {
+          gen_ai: prompts.gen_ai,
+          mle: prompts.mle,
+          mix: prompts.mix,
+        },
+        exported_at: new Date().toISOString(),
+      };
+
+      const outPath = path.join(outDir, 'seer-profile-export.json');
+      fs.writeFileSync(outPath, JSON.stringify(exportData, null, 2));
+
+      console.log('\n=== THE SEER — Profile Export ===\n');
+      console.log(`Profile exported to: ${outPath}`);
+      console.log(`Expert skills: ${profile.skills_expert.length}`);
+      console.log(`Proficient skills: ${profile.skills_proficient.length}`);
+      console.log(`Familiar skills: ${profile.skills_familiar.length}`);
+      console.log(`Prompt templates: 3 (gen_ai, mle, mix)`);
+      console.log('\n-> Import this file into The Seer Chrome extension via Options page.');
+      break;
+    }
+
     default: {
       console.log(`
 THE SEER — AI-Powered Resume Tailoring Engine
@@ -282,6 +339,7 @@ Commands:
   pnpm seer analyze ./jd.txt     Deep fit analysis via Gemini
   pnpm seer prompt ./jd.txt      Generate Claude.ai prompt (analyze + build)
   pnpm seer full ./jd.txt        Full pipeline (quick-fit + analyze + prompt)
+  pnpm seer export               Export profile for Chrome extension
 `);
     }
   }
