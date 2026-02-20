@@ -9,6 +9,34 @@ if (!(window as any).__seerInjected) {
 function init() {
   console.log('[Seer] Content script initialized on:', window.location.href);
 
+  // ─── Toggle listener: show/hide FAB when popup toggle changes ───
+  chrome.runtime.onMessage.addListener((msg) => {
+    if (msg.type === 'SEER_TOGGLE') {
+      const fab = document.getElementById('seer-fab');
+      if (msg.enabled) {
+        if (!fab) {
+          const newFab = createFab();
+          document.body.appendChild(newFab);
+          attachDragHandler(newFab);
+        }
+      } else {
+        fab?.remove();
+        document.getElementById('seer-results-panel')?.remove();
+        document.getElementById('seer-score-badge')?.remove();
+        document.getElementById('seer-toast')?.remove();
+      }
+    }
+  });
+
+  // Check initial enabled state
+  chrome.storage.local.get('seerEnabled', (data) => {
+    if (data.seerEnabled === false) {
+      console.log('[Seer] Extension disabled — skipping FAB injection');
+      return;
+    }
+    injectFab();
+  });
+
   // Create floating button
   function createFab(): HTMLDivElement {
     const el = document.createElement('div');
@@ -19,20 +47,6 @@ function init() {
     `;
     return el;
   }
-
-  let fab = createFab();
-  document.body.appendChild(fab);
-
-  // Re-inject if SPA frameworks remove our FAB
-  const fabObserver = new MutationObserver(() => {
-    if (!document.getElementById('seer-fab')) {
-      console.log('[Seer] FAB was removed — re-injecting');
-      fab = createFab();
-      document.body.appendChild(fab);
-      attachDragHandler(fab);
-    }
-  });
-  fabObserver.observe(document.body, { childList: true, subtree: true });
 
   let isAnalyzing = false;
   let pageAnalyzed = false;
@@ -78,7 +92,26 @@ function init() {
       document.addEventListener('mouseup', onMouseUp);
     });
   }
-  attachDragHandler(fab);
+  function injectFab() {
+    let fab = createFab();
+    document.body.appendChild(fab);
+    attachDragHandler(fab);
+
+    // Re-inject if SPA frameworks remove our FAB
+    const fabObserver = new MutationObserver(() => {
+      if (!document.getElementById('seer-fab')) {
+        // Only re-inject if still enabled
+        chrome.storage.local.get('seerEnabled', (data) => {
+          if (data.seerEnabled === false) return;
+          console.log('[Seer] FAB was removed — re-injecting');
+          fab = createFab();
+          document.body.appendChild(fab);
+          attachDragHandler(fab);
+        });
+      }
+    });
+    fabObserver.observe(document.body, { childList: true, subtree: true });
+  }
 
   // ─── Click handler: extract + send to background ─────────────────
   async function handleClick() {

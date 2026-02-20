@@ -1,11 +1,29 @@
 import type { ScrapedJob, FitAnalysis } from '../shared/types.js';
+import { getEnabled, setEnabled } from '../shared/storage.js';
 
 const contentEl = document.getElementById('content')!;
 const optionsLink = document.getElementById('options-link')!;
+const toggle = document.getElementById('seer-toggle') as HTMLInputElement;
 
 optionsLink.addEventListener('click', (e) => {
   e.preventDefault();
   chrome.runtime.openOptionsPage();
+});
+
+// ─── Toggle ──────────────────────────────────────────────────────────
+getEnabled().then(on => { toggle.checked = on; });
+
+toggle.addEventListener('change', async () => {
+  const enabled = toggle.checked;
+  await setEnabled(enabled);
+
+  // Notify all tabs so content script can show/hide FAB immediately
+  const tabs = await chrome.tabs.query({});
+  for (const tab of tabs) {
+    if (tab.id) {
+      chrome.tabs.sendMessage(tab.id, { type: 'SEER_TOGGLE', enabled }).catch(() => {});
+    }
+  }
 });
 
 async function init() {

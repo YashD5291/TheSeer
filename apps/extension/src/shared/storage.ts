@@ -38,3 +38,12 @@ export async function isConfigured(): Promise<boolean> {
   const settings = await getSettings();
   return !!settings.profile;
 }
+
+export async function getEnabled(): Promise<boolean> {
+  const data: Record<string, any> = await chrome.storage.local.get('seerEnabled');
+  return data.seerEnabled !== false; // default on
+}
+
+export async function setEnabled(enabled: boolean): Promise<void> {
+  await chrome.storage.local.set({ seerEnabled: enabled });
+}

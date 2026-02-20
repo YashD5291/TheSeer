@@ -1,4 +1,4 @@
-import { getSettings, saveCurrentJob, getCurrentJob } from '../shared/storage.js';
+import { getSettings, saveCurrentJob, getCurrentJob, getEnabled } from '../shared/storage.js';
 import { quickFitCheck } from '../shared/quick-fit.js';
 import { extractAndAnalyzeViaGrok } from '../shared/grok-client.js';
 import { buildClaudePrompt } from '../shared/prompt-builder.js';
@@ -8,6 +8,8 @@ import type { ScrapedJob, MessageType } from '../shared/types.js';
 chrome.runtime.onMessage.addListener((message: MessageType, _sender, sendResponse) => {
   // Grok automation results are handled by the one-time listener in callGrok — skip here
   if ((message as any).type === 'SEER_GROK_RESULT') return;
+  // Toggle messages are handled by content script directly
+  if ((message as any).type === 'SEER_TOGGLE') return;
 
   handleMessage(message).then(sendResponse).catch(err => {
     sendResponse({ type: 'ERROR', message: err.message || 'Unknown error' });
@@ -22,6 +24,11 @@ async function handleMessage(message: MessageType): Promise<any> {
   switch (message.type) {
     // ─── New: Content script sends extraction result ──────────────
     case 'PAGE_EXTRACTED': {
+      const enabled = await getEnabled();
+      if (!enabled) {
+        return { type: 'ERROR', message: 'Seer is disabled.' };
+      }
+
       const { extraction } = message;
       console.log(`[Seer BG] Extraction method: ${extraction.extractionMethod}, hasJobData: ${!!extraction.jobData}, rawText: ${extraction.rawText.length} chars`);
 
