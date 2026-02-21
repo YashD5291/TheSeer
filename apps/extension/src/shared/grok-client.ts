@@ -153,6 +153,66 @@ function grokAutomation(prompt: string, requestId: string): void {
       if (!input) { sendError('Chat input not found after 10s'); return; }
       await sleep(500); // Let ProseMirror fully initialize
 
+      // ── Step 1.5: Ensure "Fast" model is selected ──
+      console.log('[Seer Grok] Step 1.5: Checking model selection...');
+
+      // Radix UI uses pointer events — simple .click() won't open dropdowns
+      const simulateClick = (el: HTMLElement) => {
+        el.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, cancelable: true }));
+        el.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, cancelable: true }));
+        el.dispatchEvent(new PointerEvent('pointerup', { bubbles: true, cancelable: true }));
+        el.dispatchEvent(new MouseEvent('mouseup', { bubbles: true, cancelable: true }));
+        el.click();
+      };
+
+      const modelBtn = document.querySelector('#model-select-trigger') as HTMLButtonElement | null;
+      if (modelBtn) {
+        const modelLabel = modelBtn.querySelector('span.font-semibold')?.textContent?.trim() || '';
+        console.log(`[Seer Grok] Step 1.5: Current model: "${modelLabel}"`);
+        if (modelLabel.toLowerCase() !== 'fast') {
+          // Open the model dropdown via pointer events (Radix UI)
+          simulateClick(modelBtn);
+          await sleep(800);
+
+          // Wait for dropdown menu to appear
+          let menu: Element | null = null;
+          for (let i = 0; i < 10; i++) {
+            menu = document.querySelector('[role="menu"][data-state="open"]');
+            if (menu) break;
+            await sleep(200);
+          }
+          console.log(`[Seer Grok] Step 1.5: Dropdown menu found: ${!!menu}`);
+
+          if (menu) {
+            // Find and click the "Fast" menu item
+            const menuItems = menu.querySelectorAll('[role="menuitem"]');
+            console.log(`[Seer Grok] Step 1.5: Found ${menuItems.length} menu items`);
+            let clicked = false;
+            for (const item of menuItems) {
+              const label = item.querySelector('span.font-semibold')?.textContent?.trim() || '';
+              console.log(`[Seer Grok] Step 1.5: Menu item: "${label}"`);
+              if (label.toLowerCase() === 'fast') {
+                simulateClick(item as HTMLElement);
+                clicked = true;
+                console.log('[Seer Grok] Step 1.5: Selected "Fast" model');
+                break;
+              }
+            }
+            if (!clicked) {
+              console.warn('[Seer Grok] Step 1.5: "Fast" option not found in dropdown items');
+              document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+            }
+          } else {
+            console.warn('[Seer Grok] Step 1.5: Dropdown menu did not appear after click');
+          }
+          await sleep(800); // Let model switch settle
+        } else {
+          console.log('[Seer Grok] Step 1.5: Already on Fast model');
+        }
+      } else {
+        console.warn('[Seer Grok] Step 1.5: Model selector button not found — proceeding');
+      }
+
       // ── Step 2: Paste prompt ──
       console.log('[Seer Grok] Step 2: Pasting prompt...');
       input.innerHTML = '';
