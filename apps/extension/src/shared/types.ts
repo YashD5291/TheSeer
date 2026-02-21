@@ -81,9 +81,10 @@ export interface ScrapedJob {
 // Messages between content script <-> background
 export type MessageType =
   | { type: 'PAGE_EXTRACTED'; extraction: ExtractionResult }
-  | { type: 'DEEP_ANALYSIS_RESULT'; result: FitAnalysis; job: JobData; model?: string }
-  | { type: 'GENERATE_PROMPT'; job: JobData; analysis: FitAnalysis }
+  | { type: 'DEEP_ANALYSIS_RESULT'; result: FitAnalysis; job: JobData; model?: string; claudePrompt?: string }
+  | { type: 'GENERATE_PROMPT'; job: JobData; analysis: FitAnalysis; tabId?: number }
   | { type: 'PROMPT_RESULT'; prompt: string }
   | { type: 'GET_CURRENT_JOB' }
   | { type: 'CURRENT_JOB_RESULT'; data: ScrapedJob | null }
+  | { type: 'GET_JOB_FOR_TAB'; tabId: number }
   | { type: 'ERROR'; message: string };

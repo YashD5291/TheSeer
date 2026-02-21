@@ -34,6 +34,28 @@ export async function getCurrentJob(): Promise<ScrapedJob | null> {
   return (data.currentJob as ScrapedJob) || null;
 }
 
+// ─── Per-tab job storage ──────────────────────────────────────────────
+
+export async function saveJobForTab(tabId: number, job: ScrapedJob): Promise<void> {
+  const data: Record<string, any> = await chrome.storage.local.get('tabJobs');
+  const tabJobs: Record<string, ScrapedJob> = data.tabJobs || {};
+  tabJobs[String(tabId)] = job;
+  await chrome.storage.local.set({ tabJobs });
+}
+
+export async function getJobForTab(tabId: number): Promise<ScrapedJob | null> {
+  const data: Record<string, any> = await chrome.storage.local.get('tabJobs');
+  const tabJobs: Record<string, ScrapedJob> = data.tabJobs || {};
+  return tabJobs[String(tabId)] || null;
+}
+
+export async function removeJobForTab(tabId: number): Promise<void> {
+  const data: Record<string, any> = await chrome.storage.local.get('tabJobs');
+  const tabJobs: Record<string, ScrapedJob> = data.tabJobs || {};
+  delete tabJobs[String(tabId)];
+  await chrome.storage.local.set({ tabJobs });
+}
+
 export async function isConfigured(): Promise<boolean> {
   const settings = await getSettings();
   return !!settings.profile;

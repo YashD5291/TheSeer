@@ -1,23 +1,29 @@
-import { getSettings, saveCurrentJob, getCurrentJob, getEnabled } from '../shared/storage.js';
+import { getSettings, saveJobForTab, getJobForTab, removeJobForTab, getEnabled } from '../shared/storage.js';
 import { extractAndAnalyzeViaGrok } from '../shared/grok-client.js';
 import { buildClaudePrompt } from '../shared/prompt-builder.js';
 import type { ScrapedJob, MessageType } from '../shared/types.js';
 
 // Handle messages from content script and popup
-chrome.runtime.onMessage.addListener((message: MessageType, _sender, sendResponse) => {
+chrome.runtime.onMessage.addListener((message: MessageType, sender, sendResponse) => {
   // Grok automation results are handled by the one-time listener in callGrok — skip here
   if ((message as any).type === 'SEER_GROK_RESULT') return;
   // Toggle messages are handled by content script directly
   if ((message as any).type === 'SEER_TOGGLE') return;
 
-  handleMessage(message).then(sendResponse).catch(err => {
+  const tabId = sender.tab?.id;
+  handleMessage(message, tabId).then(sendResponse).catch(err => {
     sendResponse({ type: 'ERROR', message: err.message || 'Unknown error' });
   });
   return true; // keep channel open for async response
 });
 
-async function handleMessage(message: MessageType): Promise<any> {
-  console.log(`[Seer BG] Received message: ${message.type}`);
+// Clean up stored job data when a tab is closed
+chrome.tabs.onRemoved.addListener((tabId) => {
+  removeJobForTab(tabId).catch(() => {});
+});
+
+async function handleMessage(message: MessageType, senderTabId?: number): Promise<any> {
+  console.log(`[Seer BG] Received message: ${message.type} (tab: ${senderTabId ?? 'unknown'})`);
   const settings = await getSettings();
 
   switch (message.type) {
@@ -90,9 +96,13 @@ async function handleMessage(message: MessageType): Promise<any> {
         claudePrompt: null,
         scrapedAt: new Date().toISOString(),
       };
-      await saveCurrentJob(scrapedJob);
-      console.log('[Seer BG] Saved to storage');
-      updateBadge(combined.analysis.fit_score, combined.analysis.fit_score >= 40);
+      if (senderTabId != null) {
+        await saveJobForTab(senderTabId, scrapedJob);
+        console.log(`[Seer BG] Saved to storage (tab ${senderTabId})`);
+        updateBadge(combined.analysis.fit_score, combined.analysis.fit_score >= 40, senderTabId);
+      } else {
+        console.log('[Seer BG] No tab ID — skipping storage save');
+      }
 
       return { type: 'DEEP_ANALYSIS_RESULT', result: combined.analysis, job: combined.job, model: combined.model };
     }
@@ -118,20 +128,34 @@ async function handleMessage(message: MessageType): Promise<any> {
 
       console.log(`[Seer BG] Prompt generated (${prompt.length} chars)`);
 
-      const currentJob2 = await getCurrentJob();
-      if (currentJob2) {
-        currentJob2.claudePrompt = prompt;
-        await saveCurrentJob(currentJob2);
+      const promptTabId = message.tabId ?? senderTabId;
+      if (promptTabId != null) {
+        const tabJob = await getJobForTab(promptTabId);
+        if (tabJob) {
+          tabJob.claudePrompt = prompt;
+          await saveJobForTab(promptTabId, tabJob);
+        }
       }
 
       return { type: 'PROMPT_RESULT', prompt };
     }
 
-    // ─── Get current job for popup ────────────────────────────────
-    case 'GET_CURRENT_JOB': {
-      const data = await getCurrentJob();
-      console.log(`[Seer BG] GET_CURRENT_JOB: ${data ? `"${data.job.title}"` : 'null'}`);
+    // ─── Get job for a specific tab ────────────────────────────────
+    case 'GET_JOB_FOR_TAB': {
+      const data = await getJobForTab(message.tabId);
+      console.log(`[Seer BG] GET_JOB_FOR_TAB (tab ${message.tabId}): ${data ? `"${data.job.title}"` : 'null'}`);
       return { type: 'CURRENT_JOB_RESULT', data };
+    }
+
+    // ─── Legacy: Get current job (kept for backward compat) ──────
+    case 'GET_CURRENT_JOB': {
+      // If sent from a content script tab, return that tab's job
+      if (senderTabId != null) {
+        const data = await getJobForTab(senderTabId);
+        console.log(`[Seer BG] GET_CURRENT_JOB (tab ${senderTabId}): ${data ? `"${data.job.title}"` : 'null'}`);
+        return { type: 'CURRENT_JOB_RESULT', data };
+      }
+      return { type: 'CURRENT_JOB_RESULT', data: null };
     }
 
     default:
@@ -140,11 +164,15 @@ async function handleMessage(message: MessageType): Promise<any> {
   }
 }
 
-function updateBadge(score: number, pass: boolean) {
-  chrome.action.setBadgeText({ text: `${score}` });
-  chrome.action.setBadgeBackgroundColor({
-    color: pass ? '#10b981' : '#ef4444',
-  });
+function updateBadge(score: number, pass: boolean, tabId?: number) {
+  const color = pass ? '#10b981' : '#ef4444';
+  if (tabId != null) {
+    chrome.action.setBadgeText({ text: `${score}`, tabId });
+    chrome.action.setBadgeBackgroundColor({ color, tabId });
+  } else {
+    chrome.action.setBadgeText({ text: `${score}` });
+    chrome.action.setBadgeBackgroundColor({ color });
+  }
 }
 
 const CRAWL_SERVER = 'http://localhost:9742';

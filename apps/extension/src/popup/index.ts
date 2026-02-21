@@ -26,9 +26,17 @@ toggle.addEventListener('change', async () => {
   }
 });
 
+let activeTabId: number | undefined;
+
 async function init() {
-  // Fetch current job data from background
-  const response = await chrome.runtime.sendMessage({ type: 'GET_CURRENT_JOB' });
+  // Determine which tab is currently active
+  const [activeTab] = await chrome.tabs.query({ active: true, currentWindow: true });
+  activeTabId = activeTab?.id;
+
+  if (!activeTabId) return;
+
+  // Fetch job data for the active tab
+  const response = await chrome.runtime.sendMessage({ type: 'GET_JOB_FOR_TAB', tabId: activeTabId });
 
   if (!response?.data) {
     // Show empty state (already in HTML)
@@ -146,6 +154,7 @@ async function generatePrompt(data: ScrapedJob) {
       type: 'GENERATE_PROMPT',
       job: data.job,
       analysis: data.deepAnalysis,
+      tabId: activeTabId,
     });
 
     if (response?.type === 'ERROR') {

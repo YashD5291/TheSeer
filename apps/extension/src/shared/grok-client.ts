@@ -13,6 +13,9 @@ export interface GrokResponse {
   model: 'grok-chat';
 }
 
+// Track Grok tabs currently in use by active analyses
+const inUseGrokTabs = new Set<number>();
+
 /**
  * Send a prompt to Grok and get the response back.
  * Opens a fresh grok.com chat, pastes the prompt, waits for
@@ -20,41 +23,49 @@ export interface GrokResponse {
  */
 export async function callGrok(prompt: string): Promise<GrokResponse> {
   const tabId = await getOrOpenFreshGrokTab();
+  inUseGrokTabs.add(tabId);
   console.log(`[Seer Grok] Tab ready (${tabId}), executing automation (${prompt.length} chars)...`);
 
+  const requestId = crypto.randomUUID();
   const t0 = Date.now();
 
-  // Set up a one-time listener for the result BEFORE injecting
-  const resultPromise = new Promise<string>((resolve, reject) => {
-    const timeout = setTimeout(() => {
-      chrome.runtime.onMessage.removeListener(listener);
-      reject(new Error('Grok automation timed out after 130s'));
-    }, 130_000);
-
-    const listener = (msg: any) => {
-      if (msg?.type === 'SEER_GROK_RESULT') {
+  try {
+    // Set up a one-time listener for the result BEFORE injecting
+    const resultPromise = new Promise<string>((resolve, reject) => {
+      const timeout = setTimeout(() => {
         chrome.runtime.onMessage.removeListener(listener);
-        clearTimeout(timeout);
-        if (msg.error) reject(new Error(msg.error));
-        else resolve(msg.text);
-      }
-    };
-    chrome.runtime.onMessage.addListener(listener);
-  });
+        reject(new Error('Grok automation timed out after 130s'));
+      }, 130_000);
 
-  // Inject the automation function (fire-and-forget — result comes via message)
-  await chrome.scripting.executeScript({
-    target: { tabId },
-    func: grokAutomation,
-    args: [prompt],
-  });
-  console.log('[Seer Grok] Automation injected, waiting for result...');
+      const listener = (msg: any) => {
+        if (msg?.type === 'SEER_GROK_RESULT' && msg.requestId === requestId) {
+          chrome.runtime.onMessage.removeListener(listener);
+          clearTimeout(timeout);
+          if (msg.error) reject(new Error(msg.error));
+          else resolve(msg.text);
+        }
+      };
+      chrome.runtime.onMessage.addListener(listener);
+    });
 
-  const text = await resultPromise;
+    // Inject the automation function (fire-and-forget — result comes via message)
+    await chrome.scripting.executeScript({
+      target: { tabId },
+      func: grokAutomation,
+      args: [prompt, requestId],
+    });
+    console.log(`[Seer Grok] Automation injected (requestId: ${requestId}), waiting for result...`);
 
-  const elapsed = ((Date.now() - t0) / 1000).toFixed(1);
-  console.log(`[Seer Grok] Response in ${elapsed}s (${text.length} chars)`);
-  return { text, model: 'grok-chat' };
+    const text = await resultPromise;
+
+    const elapsed = ((Date.now() - t0) / 1000).toFixed(1);
+    console.log(`[Seer Grok] Response in ${elapsed}s (${text.length} chars)`);
+    return { text, model: 'grok-chat' };
+  } finally {
+    inUseGrokTabs.delete(tabId);
+    chrome.tabs.remove(tabId).catch(() => {});
+    console.log(`[Seer Grok] Closed tab ${tabId}`);
+  }
 }
 
 // ─── Tab management (runs in background) ─────────────────────────────
@@ -62,12 +73,15 @@ export async function callGrok(prompt: string): Promise<GrokResponse> {
 async function getOrOpenFreshGrokTab(): Promise<number> {
   const tabs = await chrome.tabs.query({ url: ['https://grok.com/*', 'https://x.com/i/grok*'] });
 
-  if (tabs.length > 0 && tabs[0].id != null) {
-    const tabId = tabs[0].id;
-    console.log(`[Seer Grok] Found existing tab ${tabId} — ${tabs[0].url}`);
+  // Find an idle Grok tab (not currently in use by another analysis)
+  const idleTab = tabs.find(t => t.id != null && !inUseGrokTabs.has(t.id));
+
+  if (idleTab && idleTab.id != null) {
+    const tabId = idleTab.id;
+    console.log(`[Seer Grok] Found idle tab ${tabId} — ${idleTab.url}`);
 
     // Navigate to fresh chat if it's on a conversation page
-    const url = tabs[0].url || '';
+    const url = idleTab.url || '';
     if (url !== 'https://grok.com/' && !url.endsWith('grok.com')) {
       console.log('[Seer Grok] Navigating to fresh chat...');
       await chrome.tabs.update(tabId, { url: 'https://grok.com/' });
@@ -76,7 +90,8 @@ async function getOrOpenFreshGrokTab(): Promise<number> {
     return tabId;
   }
 
-  console.log('[Seer Grok] Opening new grok.com tab...');
+  // No idle tab available — create a new one
+  console.log(`[Seer Grok] No idle Grok tab (${inUseGrokTabs.size} in use) — opening new tab...`);
   const newTab = await chrome.tabs.create({ url: 'https://grok.com/', active: false });
   await waitForTabLoad(newTab.id!);
   console.log(`[Seer Grok] New tab loaded (${newTab.id})`);
@@ -102,7 +117,7 @@ function waitForTabLoad(tabId: number): Promise<void> {
  * It must be entirely self-contained — no imports, no external references.
  * Sends the result back via chrome.runtime.sendMessage (fire-and-forget pattern).
  */
-function grokAutomation(prompt: string): void {
+function grokAutomation(prompt: string, requestId: string): void {
   const SELECTORS = {
     chatInput: '.query-bar div.tiptap.ProseMirror[contenteditable="true"]',
     chatInputFallback: 'div.ProseMirror[contenteditable="true"]',
@@ -115,12 +130,12 @@ function grokAutomation(prompt: string): void {
   const MAX_WAIT = 120_000;
   const sleep = (ms: number) => new Promise<void>(r => setTimeout(r, ms));
 
-  // Send result back to background
+  // Send result back to background (tagged with requestId)
   const sendResult = (text: string) => {
-    chrome.runtime.sendMessage({ type: 'SEER_GROK_RESULT', text });
+    chrome.runtime.sendMessage({ type: 'SEER_GROK_RESULT', requestId, text });
   };
   const sendError = (error: string) => {
-    chrome.runtime.sendMessage({ type: 'SEER_GROK_RESULT', error });
+    chrome.runtime.sendMessage({ type: 'SEER_GROK_RESULT', requestId, error });
   };
 
   // Run the automation as an async IIFE
