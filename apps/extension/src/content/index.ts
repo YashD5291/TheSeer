@@ -6,24 +6,112 @@ if (!(window as any).__seerInjected) {
   init();
 }
 
+// ─── Shared overlay shadow (FAB, badge, toast) ───────────────────────
+
+const OVERLAY_CSS = `
+  :host { all: initial; }
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  .fab {
+    position: fixed; bottom: 24px; right: 24px; z-index: 999999;
+    cursor: grab; display: flex; align-items: center; gap: 8px;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    user-select: none; -webkit-user-select: none; touch-action: none;
+  }
+  .fab:active { cursor: grabbing; }
+  .fab:hover .fab-tooltip { opacity: 1; transform: translateX(0); }
+  .fab-icon {
+    width: 44px; height: 44px; border-radius: 12px;
+    background: #1a1a2e; color: #e0e0e8;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 18px; font-weight: 700;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.25), 0 0 0 1px rgba(255,255,255,0.06);
+    transition: transform 0.15s, box-shadow 0.15s;
+  }
+  .fab-icon:hover {
+    transform: scale(1.05);
+    box-shadow: 0 4px 16px rgba(0,0,0,0.3), 0 0 0 1px rgba(255,255,255,0.08);
+  }
+  .fab-icon.loading { animation: pulse 1s infinite; }
+  .fab-tooltip {
+    background: #27272a; color: #e4e4e7;
+    padding: 6px 10px; border-radius: 6px; font-size: 12px;
+    white-space: nowrap; opacity: 0; transform: translateX(8px);
+    transition: opacity 0.15s, transform 0.15s;
+    pointer-events: none; order: -1;
+  }
+
+  .badge {
+    position: fixed; bottom: 72px; right: 28px; z-index: 999999;
+    width: 36px; height: 36px; border-radius: 8px;
+    display: none; align-items: center; justify-content: center;
+    font-size: 13px; font-weight: 700;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.2); animation: pop 0.3s ease-out;
+  }
+  .badge.show { display: flex; }
+  .badge-pass { background: #16a34a; color: white; }
+  .badge-fail { background: #dc2626; color: white; }
+
+  .toast {
+    position: fixed; bottom: 80px; right: 80px; z-index: 999999;
+    padding: 10px 16px; border-radius: 8px; font-size: 13px;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    box-shadow: 0 4px 16px rgba(0,0,0,0.12); animation: slide-in 0.3s ease-out;
+    max-width: 360px; border: 1px solid; display: none;
+  }
+  .toast.show { display: block; }
+  .toast-success { background: #f0fdf4; color: #166534; border-color: #bbf7d0; }
+  .toast-warning { background: #fffbeb; color: #92400e; border-color: #fde68a; }
+  .toast-error { background: #fef2f2; color: #991b1b; border-color: #fecaca; }
+
+  @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.5; } }
+  @keyframes pop { 0% { transform: scale(0); } 70% { transform: scale(1.15); } 100% { transform: scale(1); } }
+  @keyframes slide-in { from { opacity: 0; transform: translateX(20px); } to { opacity: 1; transform: translateX(0); } }
+`;
+
+let overlayShadow: ShadowRoot | null = null;
+
+function getOverlay(): ShadowRoot {
+  let host = document.getElementById('seer-overlay');
+  if (host?.shadowRoot) {
+    overlayShadow = host.shadowRoot;
+    return overlayShadow;
+  }
+
+  host = document.createElement('div');
+  host.id = 'seer-overlay';
+  const shadow = host.attachShadow({ mode: 'open' });
+  shadow.innerHTML = `
+    <style>${OVERLAY_CSS}</style>
+    <div class="badge" data-badge></div>
+    <div class="toast" data-toast></div>
+  `;
+  document.body.appendChild(host);
+  overlayShadow = shadow;
+  return shadow;
+}
+
+// ─── Main init ───────────────────────────────────────────────────────
+
 function init() {
   console.log('[Seer] Content script initialized on:', window.location.href);
 
   // ─── Toggle listener: show/hide FAB when popup toggle changes ───
   chrome.runtime.onMessage.addListener((msg) => {
     if (msg.type === 'SEER_TOGGLE') {
-      const fab = document.getElementById('seer-fab');
+      const shadow = getOverlay();
       if (msg.enabled) {
-        if (!fab) {
-          const newFab = createFab();
-          document.body.appendChild(newFab);
-          attachDragHandler(newFab);
+        if (!shadow.querySelector('.fab')) {
+          injectFabInto(shadow);
         }
       } else {
-        fab?.remove();
-        document.getElementById('seer-results-panel')?.remove();
-        document.getElementById('seer-score-badge')?.remove();
-        document.getElementById('seer-toast')?.remove();
+        shadow.querySelector('.fab')?.remove();
+        document.getElementById('seer-panel-host')?.remove();
+        const badge = shadow.querySelector('[data-badge]') as HTMLElement;
+        if (badge) { badge.classList.remove('show'); }
+        const toast = shadow.querySelector('[data-toast]') as HTMLElement;
+        if (toast) { toast.classList.remove('show'); }
       }
     }
   });
@@ -34,19 +122,23 @@ function init() {
       console.log('[Seer] Extension disabled — skipping FAB injection');
       return;
     }
-    injectFab();
-  });
+    const shadow = getOverlay();
+    injectFabInto(shadow);
 
-  // Create floating button
-  function createFab(): HTMLDivElement {
-    const el = document.createElement('div');
-    el.id = 'seer-fab';
-    el.innerHTML = `
-      <div id="seer-fab-icon">S</div>
-      <div id="seer-fab-tooltip">Analyze with Seer</div>
-    `;
-    return el;
-  }
+    // Re-inject if SPA frameworks remove our overlay host
+    const observer = new MutationObserver(() => {
+      if (!document.getElementById('seer-overlay')) {
+        chrome.storage.local.get('seerEnabled', (d) => {
+          if (d.seerEnabled === false) return;
+          console.log('[Seer] Overlay was removed — re-injecting');
+          overlayShadow = null;
+          const s = getOverlay();
+          injectFabInto(s);
+        });
+      }
+    });
+    observer.observe(document.body, { childList: true, subtree: true });
+  });
 
   let isAnalyzing = false;
   let pageAnalyzed = false;
@@ -57,6 +149,17 @@ function init() {
   let dragStartY = 0;
   let fabStartX = 0;
   let fabStartY = 0;
+
+  function injectFabInto(shadow: ShadowRoot) {
+    const fab = document.createElement('div');
+    fab.className = 'fab';
+    fab.innerHTML = `
+      <div class="fab-icon" data-icon>S</div>
+      <div class="fab-tooltip">Analyze with Seer</div>
+    `;
+    shadow.appendChild(fab);
+    attachDragHandler(fab);
+  }
 
   function attachDragHandler(target: HTMLDivElement) {
     target.addEventListener('mousedown', (e: MouseEvent) => {
@@ -92,26 +195,6 @@ function init() {
       document.addEventListener('mouseup', onMouseUp);
     });
   }
-  function injectFab() {
-    let fab = createFab();
-    document.body.appendChild(fab);
-    attachDragHandler(fab);
-
-    // Re-inject if SPA frameworks remove our FAB
-    const fabObserver = new MutationObserver(() => {
-      if (!document.getElementById('seer-fab')) {
-        // Only re-inject if still enabled
-        chrome.storage.local.get('seerEnabled', (data) => {
-          if (data.seerEnabled === false) return;
-          console.log('[Seer] FAB was removed — re-injecting');
-          fab = createFab();
-          document.body.appendChild(fab);
-          attachDragHandler(fab);
-        });
-      }
-    });
-    fabObserver.observe(document.body, { childList: true, subtree: true });
-  }
 
   // ─── Click handler: extract + send to background ─────────────────
   async function handleClick() {
@@ -125,9 +208,10 @@ function init() {
     if (isAnalyzing) return;
     isAnalyzing = true;
 
-    const icon = document.getElementById('seer-fab-icon')!;
+    const shadow = getOverlay();
+    const icon = shadow.querySelector('[data-icon]') as HTMLElement;
     icon.textContent = '...';
-    icon.classList.add('seer-loading');
+    icon.classList.add('loading');
     console.log('[Seer] ─── Analysis started ───');
 
     try {
@@ -191,14 +275,15 @@ function init() {
       showToast(err.message || 'Analysis failed', 'error');
     } finally {
       isAnalyzing = false;
-      const icon = document.getElementById('seer-fab-icon')!;
-      icon.classList.remove('seer-loading');
-      icon.textContent = pageAnalyzed ? '✓' : 'S';
+      const s = getOverlay();
+      const ic = s.querySelector('[data-icon]') as HTMLElement;
+      ic.classList.remove('loading');
+      ic.textContent = pageAnalyzed ? '✓' : 'S';
     }
   }
 }
 
-// ─── Floating results panel ──────────────────────────────────────────
+// ─── Floating results panel (own Shadow DOM) ─────────────────────────
 
 interface PanelData {
   job: any;
@@ -213,99 +298,198 @@ interface PanelData {
   atsKeywords: string[];
 }
 
-function showResultsPanel(data: PanelData) {
-  document.getElementById('seer-results-panel')?.remove();
+const PANEL_CSS = `
+  :host { all: initial; }
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
-  const panel = document.createElement('div');
-  panel.id = 'seer-results-panel';
+  .panel {
+    position: fixed; top: 16px; right: -420px;
+    width: 390px; max-height: calc(100vh - 32px);
+    background: #fff; border-radius: 12px;
+    box-shadow: 0 8px 30px rgba(0,0,0,0.12), 0 1px 3px rgba(0,0,0,0.06);
+    border: 1px solid #e4e4e7;
+    overflow: hidden; display: flex; flex-direction: column;
+    transition: right 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    font-size: 14px; line-height: 1.5; color: #18181b;
+    z-index: 999998;
+  }
+  .panel.visible { right: 16px; }
+
+  .header {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 12px 16px; background: #1a1a2e; color: #f0f0f4; flex-shrink: 0;
+  }
+  .header-title { font-size: 13px; font-weight: 600; letter-spacing: 0.2px; }
+  .header-close {
+    background: none; border: none; color: #8b8b9e;
+    font-size: 20px; cursor: pointer; padding: 0 4px; line-height: 1;
+    transition: color 0.15s; font-family: inherit;
+  }
+  .header-close:hover { color: #f0f0f4; }
+
+  .body { padding: 16px; overflow-y: auto; flex: 1; }
+
+  .score {
+    display: flex; align-items: baseline; justify-content: center;
+    gap: 2px; padding: 16px 0 12px;
+  }
+  .score-num { font-size: 44px; font-weight: 800; line-height: 1; }
+  .score-label { font-size: 16px; font-weight: 600; color: #a1a1aa; }
+  .score-pass .score-num { color: #16a34a; }
+  .score-fail .score-num { color: #dc2626; }
+
+  .job {
+    text-align: center; padding-bottom: 12px;
+    border-bottom: 1px solid #e4e4e7; margin-bottom: 12px;
+  }
+  .job-title { font-size: 15px; font-weight: 700; color: #18181b; margin-bottom: 4px; }
+  .job-company { font-size: 13px; color: #71717a; font-weight: 500; }
+  .job-meta { font-size: 12px; color: #a1a1aa; margin-top: 4px; }
+
+  .meta {
+    display: flex; flex-wrap: wrap; gap: 6px;
+    margin-bottom: 14px; justify-content: center;
+  }
+  .tag {
+    font-size: 11px; padding: 3px 8px; border-radius: 4px;
+    background: #f4f4f5; color: #3f3f46; font-weight: 500;
+    display: inline-block;
+  }
+  .rec-strong_yes { background: #dcfce7; color: #166534; }
+  .rec-yes { background: #dbeafe; color: #1e40af; }
+  .rec-maybe { background: #fef3c7; color: #92400e; }
+  .rec-no { background: #fee2e2; color: #991b1b; }
+  .tag-model { background: #f4f4f5; color: #52525b; font-family: monospace; font-size: 10px; }
+
+  .section { margin-bottom: 16px; }
+  .section-title {
+    font-size: 11px; font-weight: 600; text-transform: uppercase;
+    letter-spacing: 0.5px; color: #71717a; margin-bottom: 6px;
+  }
+  .section-body { font-size: 13px; color: #3f3f46; line-height: 1.5; }
+  .section-body strong { font-weight: 700; }
+
+  .tags { display: flex; flex-wrap: wrap; gap: 6px; }
+  .tag-match {
+    font-size: 12px; padding: 3px 8px; border-radius: 4px;
+    background: #dcfce7; color: #166534; font-weight: 500;
+    line-height: 1.3; display: inline-block;
+  }
+  .tag-gap {
+    font-size: 12px; padding: 3px 8px; border-radius: 4px;
+    background: #fee2e2; color: #991b1b; font-weight: 500;
+    line-height: 1.3; display: inline-block;
+  }
+  .tag-kw {
+    font-size: 12px; padding: 3px 8px; border-radius: 4px;
+    background: #e0f2fe; color: #0c4a6e; font-weight: 500;
+    line-height: 1.3; display: inline-block;
+  }
+
+  .desc-header { display: flex; align-items: center; justify-content: space-between; }
+  .desc {
+    font-size: 12px; color: #52525b; line-height: 1.6;
+    white-space: pre-wrap; max-height: 400px; overflow-y: auto;
+    background: #fafafa; padding: 10px; border-radius: 6px;
+    border: 1px solid #e4e4e7;
+  }
+  .copy-btn {
+    font-size: 11px; padding: 2px 10px; border-radius: 4px;
+    border: 1px solid #d4d4d8; background: #fff; color: #3f3f46;
+    cursor: pointer; font-weight: 600; transition: background 0.15s, border-color 0.15s;
+    font-family: inherit;
+  }
+  .copy-btn:hover { background: #f4f4f5; border-color: #a1a1aa; }
+`;
+
+function showResultsPanel(data: PanelData) {
+  document.getElementById('seer-panel-host')?.remove();
+
+  const host = document.createElement('div');
+  host.id = 'seer-panel-host';
+  const shadow = host.attachShadow({ mode: 'open' });
 
   const recLabel: Record<string, string> = {
-    'strong_yes': 'Strong Yes',
-    'yes': 'Yes',
-    'maybe': 'Maybe',
-    'no': 'No',
+    'strong_yes': 'Strong Yes', 'yes': 'Yes',
+    'maybe': 'Maybe', 'no': 'No',
   };
 
-  let html = `
-    <div id="seer-panel-header">
-      <span id="seer-panel-title">As told by The Seer</span>
-      <button id="seer-panel-close">&times;</button>
+  let body = `
+    <div class="score ${data.pass ? 'score-pass' : 'score-fail'}">
+      <span class="score-num">${data.score}</span>
+      <span class="score-label">/100</span>
     </div>
-    <div id="seer-panel-body">
-      <div class="seer-panel-score ${data.pass ? 'seer-panel-pass' : 'seer-panel-fail'}">
-        <span class="seer-panel-score-num">${data.score}</span>
-        <span class="seer-panel-score-label">/100</span>
-      </div>
-
-      <div class="seer-panel-job">
-        <div class="seer-panel-job-title">${esc(data.job.title || 'Unknown Title')}</div>
-        <div class="seer-panel-job-company">${esc(data.job.company || 'Unknown Company')}</div>
-        ${data.job.location ? `<div class="seer-panel-job-meta">${esc(data.job.location)}</div>` : ''}
-        ${data.job.salary_range ? `<div class="seer-panel-job-meta">${esc(data.job.salary_range)}</div>` : ''}
-      </div>
-
-      <div class="seer-panel-meta">
-        <span class="seer-panel-tag seer-panel-rec-${data.recommendation}">${recLabel[data.recommendation] || data.recommendation}</span>
-        <span class="seer-panel-tag seer-panel-tag-model">${data.model}</span>
-      </div>
-
-      <div class="seer-panel-section">
-        <div class="seer-panel-section-title">Recommended Base</div>
-        <div class="seer-panel-section-body"><strong>${data.base}</strong> — ${esc(data.baseReasoning)}</div>
-      </div>
+    <div class="job">
+      <div class="job-title">${esc(data.job.title || 'Unknown Title')}</div>
+      <div class="job-company">${esc(data.job.company || 'Unknown Company')}</div>
+      ${data.job.location ? `<div class="job-meta">${esc(data.job.location)}</div>` : ''}
+      ${data.job.salary_range ? `<div class="job-meta">${esc(data.job.salary_range)}</div>` : ''}
+    </div>
+    <div class="meta">
+      <span class="tag rec-${data.recommendation}">${recLabel[data.recommendation] || data.recommendation}</span>
+      <span class="tag tag-model">${data.model}</span>
+    </div>
+    <div class="section">
+      <div class="section-title">Recommended Base</div>
+      <div class="section-body"><strong>${data.base}</strong> — ${esc(data.baseReasoning)}</div>
+    </div>
   `;
 
   if (data.keyMatches.length > 0) {
-    html += `
-      <div class="seer-panel-section">
-        <div class="seer-panel-section-title">Key Matches (${data.keyMatches.length})</div>
-        <div class="seer-panel-tags">${data.keyMatches.map(s => `<span class="seer-panel-tag-match">${esc(s)}</span>`).join('')}</div>
-      </div>
-    `;
+    body += `
+      <div class="section">
+        <div class="section-title">Key Matches (${data.keyMatches.length})</div>
+        <div class="tags">${data.keyMatches.map(s => `<span class="tag-match">${esc(s)}</span>`).join('')}</div>
+      </div>`;
   }
-
   if (data.gaps.length > 0) {
-    html += `
-      <div class="seer-panel-section">
-        <div class="seer-panel-section-title">Gaps (${data.gaps.length})</div>
-        <div class="seer-panel-tags">${data.gaps.map(s => `<span class="seer-panel-tag-gap">${esc(s)}</span>`).join('')}</div>
-      </div>
-    `;
+    body += `
+      <div class="section">
+        <div class="section-title">Gaps (${data.gaps.length})</div>
+        <div class="tags">${data.gaps.map(s => `<span class="tag-gap">${esc(s)}</span>`).join('')}</div>
+      </div>`;
   }
-
   if (data.atsKeywords.length > 0) {
-    html += `
-      <div class="seer-panel-section">
-        <div class="seer-panel-section-title">ATS Keywords</div>
-        <div class="seer-panel-tags">${data.atsKeywords.map(s => `<span class="seer-panel-tag-kw">${esc(s)}</span>`).join('')}</div>
-      </div>
-    `;
+    body += `
+      <div class="section">
+        <div class="section-title">ATS Keywords</div>
+        <div class="tags">${data.atsKeywords.map(s => `<span class="tag-kw">${esc(s)}</span>`).join('')}</div>
+      </div>`;
   }
-
   if (data.job.description) {
-    html += `
-      <div class="seer-panel-section">
-        <div class="seer-panel-section-title" style="display:flex;align-items:center;justify-content:space-between;">
+    body += `
+      <div class="section">
+        <div class="section-title desc-header">
           <span>Full Description</span>
-          <button id="seer-copy-jd" class="seer-copy-btn">Copy JD</button>
+          <button class="copy-btn" data-copy>Copy JD</button>
         </div>
-        <div class="seer-panel-desc">${esc(data.job.description)}</div>
-      </div>
-    `;
+        <div class="desc">${esc(data.job.description)}</div>
+      </div>`;
   }
 
-  html += `</div>`;
-  panel.innerHTML = html;
-  document.body.appendChild(panel);
+  shadow.innerHTML = `
+    <style>${PANEL_CSS}</style>
+    <div class="panel">
+      <div class="header">
+        <span class="header-title">As told by The Seer</span>
+        <button class="header-close">&times;</button>
+      </div>
+      <div class="body">${body}</div>
+    </div>
+  `;
 
-  requestAnimationFrame(() => panel.classList.add('seer-panel-visible'));
+  document.body.appendChild(host);
 
-  document.getElementById('seer-panel-close')!.addEventListener('click', () => {
-    panel.classList.remove('seer-panel-visible');
-    setTimeout(() => panel.remove(), 300);
+  const panel = shadow.querySelector('.panel') as HTMLElement;
+  requestAnimationFrame(() => panel.classList.add('visible'));
+
+  shadow.querySelector('.header-close')!.addEventListener('click', () => {
+    panel.classList.remove('visible');
+    setTimeout(() => host.remove(), 300);
   });
 
-  const copyBtn = document.getElementById('seer-copy-jd');
+  const copyBtn = shadow.querySelector('[data-copy]');
   if (copyBtn && data.job.description) {
     copyBtn.addEventListener('click', () => {
       navigator.clipboard.writeText(data.job.description).then(() => {
@@ -317,41 +501,33 @@ function showResultsPanel(data: PanelData) {
 }
 
 function togglePanel() {
-  const panel = document.getElementById('seer-results-panel');
-  if (panel) {
-    panel.classList.remove('seer-panel-visible');
-    setTimeout(() => panel.remove(), 300);
+  const host = document.getElementById('seer-panel-host');
+  if (host?.shadowRoot) {
+    const panel = host.shadowRoot.querySelector('.panel');
+    panel?.classList.remove('visible');
+    setTimeout(() => host.remove(), 300);
   }
+}
+
+// ─── Score badge + toast (via overlay shadow) ────────────────────────
+
+function showScoreBadge(score: number, pass: boolean) {
+  const shadow = getOverlay();
+  const badge = shadow.querySelector('[data-badge]') as HTMLElement;
+  badge.textContent = `${score}`;
+  badge.className = `badge show ${pass ? 'badge-pass' : 'badge-fail'}`;
+}
+
+function showToast(message: string, type: 'success' | 'warning' | 'error') {
+  const shadow = getOverlay();
+  const toast = shadow.querySelector('[data-toast]') as HTMLElement;
+  toast.textContent = message;
+  toast.className = `toast show toast-${type}`;
+  setTimeout(() => { toast.classList.remove('show'); }, 5000);
 }
 
 function esc(s: string): string {
   const div = document.createElement('div');
   div.textContent = s;
   return div.innerHTML;
-}
-
-// ─── Score badge + toast ─────────────────────────────────────────────
-
-function showScoreBadge(score: number, pass: boolean) {
-  let badge = document.getElementById('seer-score-badge');
-  if (!badge) {
-    badge = document.createElement('div');
-    badge.id = 'seer-score-badge';
-    document.body.appendChild(badge);
-  }
-  badge.textContent = `${score}`;
-  badge.className = pass ? 'seer-badge-pass' : 'seer-badge-fail';
-}
-
-function showToast(message: string, type: 'success' | 'warning' | 'error') {
-  const existing = document.getElementById('seer-toast');
-  if (existing) existing.remove();
-
-  const toast = document.createElement('div');
-  toast.id = 'seer-toast';
-  toast.className = `seer-toast-${type}`;
-  toast.textContent = message;
-  document.body.appendChild(toast);
-
-  setTimeout(() => toast.remove(), 5000);
 }
