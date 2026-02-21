@@ -1,12 +1,14 @@
 import { getSettings, saveJobForTab, getJobForTab, removeJobForTab, getEnabled } from '../shared/storage.js';
 import { extractAndAnalyzeViaGrok } from '../shared/grok-client.js';
 import { buildClaudePrompt } from '../shared/prompt-builder.js';
+import { submitPromptToClaude } from '../shared/claude-client.js';
 import type { ScrapedJob, MessageType } from '../shared/types.js';
 
 // Handle messages from content script and popup
 chrome.runtime.onMessage.addListener((message: MessageType, sender, sendResponse) => {
-  // Grok automation results are handled by the one-time listener in callGrok — skip here
+  // Grok/Claude automation results are handled by one-time listeners — skip here
   if ((message as any).type === 'SEER_GROK_RESULT') return;
+  if ((message as any).type === 'SEER_CLAUDE_RESULT') return;
   // Toggle messages are handled by content script directly
   if ((message as any).type === 'SEER_TOGGLE') return;
 
@@ -88,12 +90,27 @@ async function handleMessage(message: MessageType, senderTabId?: number): Promis
       console.log(`[Seer BG] Extracted: "${combined.job.title}" @ ${combined.job.company}`);
       console.log(`[Seer BG] Fit: ${combined.analysis.fit_score}/100, base: ${combined.analysis.recommended_base}, rec: ${combined.analysis.apply_recommendation}`);
 
+      // Auto-build Claude prompt if template exists for the recommended base
+      let claudePrompt: string | undefined;
+      const promptTemplate = settings.prompts[combined.analysis.recommended_base];
+      if (promptTemplate) {
+        claudePrompt = buildClaudePrompt({
+          job: combined.job,
+          analysis: combined.analysis,
+          promptTemplate,
+          selectedBase: combined.analysis.recommended_base,
+        });
+        console.log(`[Seer BG] Auto-built Claude prompt (${claudePrompt.length} chars, base: ${combined.analysis.recommended_base})`);
+      } else {
+        console.log(`[Seer BG] No prompt template for "${combined.analysis.recommended_base}" — skipping auto-prompt`);
+      }
+
       const scrapedJob: ScrapedJob = {
         job: combined.job,
         extraction,
         deepAnalysis: combined.analysis,
         geminiModel: combined.model,
-        claudePrompt: null,
+        claudePrompt: claudePrompt || null,
         scrapedAt: new Date().toISOString(),
       };
       if (senderTabId != null) {
@@ -104,7 +121,21 @@ async function handleMessage(message: MessageType, senderTabId?: number): Promis
         console.log('[Seer BG] No tab ID — skipping storage save');
       }
 
-      return { type: 'DEEP_ANALYSIS_RESULT', result: combined.analysis, job: combined.job, model: combined.model };
+      // Fire off Claude submission (non-blocking)
+      if (claudePrompt && senderTabId != null) {
+        const tid = senderTabId;
+        submitPromptToClaude(claudePrompt)
+          .then(() => {
+            console.log('[Seer BG] Claude prompt submitted successfully');
+            chrome.tabs.sendMessage(tid, { type: 'SEER_CLAUDE_DONE' }).catch(() => {});
+          })
+          .catch(err => {
+            console.log(`[Seer BG] Claude submission failed: ${err.message}`);
+            chrome.tabs.sendMessage(tid, { type: 'SEER_CLAUDE_ERROR', message: err.message }).catch(() => {});
+          });
+      }
+
+      return { type: 'DEEP_ANALYSIS_RESULT', result: combined.analysis, job: combined.job, model: combined.model, claudePrompt };
     }
 
     // ─── Generate Claude prompt ───────────────────────────────────

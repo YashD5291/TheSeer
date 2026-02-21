@@ -114,6 +114,23 @@ function init() {
         if (toast) { toast.classList.remove('show'); }
       }
     }
+    // Claude submission status updates
+    if (msg.type === 'SEER_CLAUDE_DONE' || msg.type === 'SEER_CLAUDE_ERROR') {
+      const panelHost = document.getElementById('seer-panel-host');
+      if (!panelHost?.shadowRoot) return;
+      const statusEl = panelHost.shadowRoot.querySelector('[data-resume-status]');
+      const statusText = panelHost.shadowRoot.querySelector('[data-status-text]');
+      if (!statusEl || !statusText) return;
+
+      statusEl.querySelector('.resume-spinner')?.remove();
+      if (msg.type === 'SEER_CLAUDE_DONE') {
+        statusEl.classList.add('ready');
+        statusText.textContent = 'Prompt submitted — switch to Claude tab';
+      } else {
+        statusEl.classList.add('error');
+        statusText.textContent = 'Claude submission failed — prompt copied to clipboard';
+      }
+    }
   });
 
   // Check initial enabled state
@@ -243,7 +260,7 @@ function init() {
       console.log('[Seer] Step 3/3: Rendering results...');
 
       if (response?.type === 'DEEP_ANALYSIS_RESULT') {
-        const { result, job, model } = response;
+        const { result, job, model, claudePrompt } = response;
         const pass = result.fit_score >= 40;
         console.log(`[Seer] Analysis: ${result.fit_score}/100, base: ${result.recommended_base}, model: ${model}`);
         showScoreBadge(result.fit_score, pass);
@@ -262,6 +279,7 @@ function init() {
           keyMatches: result.key_matches || [],
           gaps: result.gaps || [],
           atsKeywords: result.ats_keywords || [],
+          claudePrompt,
         });
         pageAnalyzed = true;
       } else if (response?.type === 'ERROR') {
@@ -296,6 +314,7 @@ interface PanelData {
   keyMatches: string[];
   gaps: string[];
   atsKeywords: string[];
+  claudePrompt?: string;
 }
 
 const PANEL_CSS = `
@@ -401,6 +420,28 @@ const PANEL_CSS = `
     font-family: inherit;
   }
   .copy-btn:hover { background: #f4f4f5; border-color: #a1a1aa; }
+
+  .resume-status {
+    padding: 12px 16px; border-top: 1px solid #e4e4e7;
+    display: flex; align-items: center; gap: 10px;
+    font-size: 13px; font-weight: 600; color: #52525b;
+    background: #fafafa; flex-shrink: 0;
+  }
+  .resume-status.ready { background: #dcfce7; color: #166534; }
+  .resume-status.error { background: #fef3c7; color: #92400e; }
+  .resume-spinner {
+    width: 16px; height: 16px; border: 2px solid #d4d4d8;
+    border-top-color: #3f3f46; border-radius: 50%;
+    animation: spin 0.8s linear infinite; flex-shrink: 0;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .resume-copy-btn {
+    margin-left: auto; font-size: 11px; padding: 4px 12px;
+    border-radius: 4px; border: 1px solid #16a34a; background: #fff;
+    color: #166534; cursor: pointer; font-weight: 600;
+    transition: background 0.15s; font-family: inherit; flex-shrink: 0;
+  }
+  .resume-copy-btn:hover { background: #f0fdf4; }
 `;
 
 function showResultsPanel(data: PanelData) {
@@ -468,6 +509,21 @@ function showResultsPanel(data: PanelData) {
       </div>`;
   }
 
+  // Resume status bar
+  let statusHtml = '';
+  if (data.claudePrompt) {
+    statusHtml = `
+      <div class="resume-status" data-resume-status>
+        <div class="resume-spinner"></div>
+        <span data-status-text>Submitting prompt to Claude...</span>
+      </div>`;
+  } else {
+    statusHtml = `
+      <div class="resume-status error">
+        <span>No prompt template found — import profile in Options</span>
+      </div>`;
+  }
+
   shadow.innerHTML = `
     <style>${PANEL_CSS}</style>
     <div class="panel">
@@ -476,6 +532,7 @@ function showResultsPanel(data: PanelData) {
         <button class="header-close">&times;</button>
       </div>
       <div class="body">${body}</div>
+      ${statusHtml}
     </div>
   `;
 
@@ -497,6 +554,11 @@ function showResultsPanel(data: PanelData) {
         setTimeout(() => { copyBtn.textContent = 'Copy JD'; }, 2000);
       });
     });
+  }
+
+  // Silently copy prompt to clipboard as fallback (in case Claude automation fails)
+  if (data.claudePrompt) {
+    navigator.clipboard.writeText(data.claudePrompt).catch(() => {});
   }
 }
 
