@@ -43,14 +43,6 @@ export interface FitAnalysis {
   apply_recommendation: 'strong_yes' | 'yes' | 'maybe' | 'no';
 }
 
-export interface QuickFitResult {
-  score: number;
-  pass: boolean;
-  matched: string[];
-  missing: string[];
-  deal_breaker_hit?: string;
-}
-
 // Extraction result from content script scrapers
 export interface ExtractionResult {
   success: boolean;
@@ -80,7 +72,6 @@ export interface SeerSettings {
 export interface ScrapedJob {
   job: JobData;
   extraction: ExtractionResult | null;
-  quickFit: QuickFitResult | null;
   deepAnalysis: FitAnalysis | null;
   geminiModel: string | null;
   claudePrompt: string | null;
@@ -90,8 +81,6 @@ export interface ScrapedJob {
 // Messages between content script <-> background
 export type MessageType =
   | { type: 'PAGE_EXTRACTED'; extraction: ExtractionResult }
-  | { type: 'QUICK_FIT_RESULT'; result: QuickFitResult; job: JobData }
-  | { type: 'DEEP_ANALYSIS_REQUEST'; job: JobData }
   | { type: 'DEEP_ANALYSIS_RESULT'; result: FitAnalysis; job: JobData; model?: string }
   | { type: 'GENERATE_PROMPT'; job: JobData; analysis: FitAnalysis }
   | { type: 'PROMPT_RESULT'; prompt: string }

@@ -1,5 +1,4 @@
 import { getSettings, saveCurrentJob, getCurrentJob, getEnabled } from '../shared/storage.js';
-import { quickFitCheck } from '../shared/quick-fit.js';
 import { extractAndAnalyzeViaGrok } from '../shared/grok-client.js';
 import { buildClaudePrompt } from '../shared/prompt-builder.js';
 import type { ScrapedJob, MessageType } from '../shared/types.js';
@@ -38,30 +37,8 @@ async function handleMessage(message: MessageType): Promise<any> {
       }
       console.log(`[Seer BG] Profile loaded (${settings.profile.skills_expert.length} expert skills)`);
 
-      // Tier 1: JSON-LD gave us structured job data — quick fit locally
-      if (extraction.jobData) {
-        console.log(`[Seer BG] Path A: Structured data available — running local quick-fit`);
-        const quickFit = quickFitCheck(extraction.jobData, settings.profile);
-        console.log(`[Seer BG] Quick-fit result: ${quickFit.score}/100 (${quickFit.pass ? 'PASS' : 'FAIL'}), ${quickFit.matched.length} matched, ${quickFit.missing.length} missing`);
-
-        const scrapedJob: ScrapedJob = {
-          job: extraction.jobData,
-          extraction,
-          quickFit,
-          deepAnalysis: null,
-          geminiModel: null,
-          claudePrompt: null,
-          scrapedAt: new Date().toISOString(),
-        };
-        await saveCurrentJob(scrapedJob);
-        console.log('[Seer BG] Saved to storage');
-        updateBadge(quickFit.score, quickFit.pass);
-
-        return { type: 'QUICK_FIT_RESULT', result: quickFit, job: extraction.jobData };
-      }
-
-      // ── Path B: No structured data — gather best content, send to Grok ──
-      console.log(`[Seer BG] Path B: No structured data — gathering content for Grok`);
+      // ── Gather best content, send to Grok for full analysis ──
+      console.log(`[Seer BG] Gathering content for Grok analysis`);
       let rawText = extraction.rawText;
 
       // Try Crawl4AI first
@@ -108,7 +85,6 @@ async function handleMessage(message: MessageType): Promise<any> {
       const scrapedJob: ScrapedJob = {
         job: combined.job,
         extraction,
-        quickFit: null,
         deepAnalysis: combined.analysis,
         geminiModel: combined.model,
         claudePrompt: null,

@@ -158,44 +158,26 @@ function init() {
       // Step 3: Show results
       console.log('[Seer] Step 3/3: Rendering results...');
 
-      if (response?.type === 'QUICK_FIT_RESULT') {
-        const { result, job } = response;
-        console.log(`[Seer] Quick-fit: ${result.score}/100, matched: [${result.matched.join(', ')}]`);
-        showScoreBadge(result.score, result.pass);
-        showToast(
-          `Fit: ${result.score}/100 ${result.pass ? '(PASS)' : '(FAIL)'} - ${result.matched.length} skills matched`,
-          result.pass ? 'success' : 'warning'
-        );
-        showResultsPanel({
-          method: extraction.extractionMethod,
-          job,
-          score: result.score,
-          pass: result.pass,
-          matched: result.matched,
-          missing: result.missing,
-        });
-        pageAnalyzed = true;
-      } else if (response?.type === 'DEEP_ANALYSIS_RESULT') {
+      if (response?.type === 'DEEP_ANALYSIS_RESULT') {
         const { result, job, model } = response;
         const pass = result.fit_score >= 40;
-        console.log(`[Seer] Grok analysis: ${result.fit_score}/100, base: ${result.recommended_base}, model: ${model}`);
+        console.log(`[Seer] Analysis: ${result.fit_score}/100, base: ${result.recommended_base}, model: ${model}`);
         showScoreBadge(result.fit_score, pass);
         showToast(
           `Fit: ${result.fit_score}/100 - ${result.apply_recommendation.replace('_', ' ')} | ${job.title} @ ${job.company}`,
           pass ? 'success' : 'warning'
         );
         showResultsPanel({
-          method: 'grok',
           job,
           score: result.fit_score,
           pass,
-          matched: result.key_matches || [],
-          missing: result.gaps || [],
-          model,
+          model: model || 'grok-chat',
           recommendation: result.apply_recommendation,
           base: result.recommended_base,
-          baseReasoning: result.base_reasoning,
-          atsKeywords: result.ats_keywords,
+          baseReasoning: result.base_reasoning || '',
+          keyMatches: result.key_matches || [],
+          gaps: result.gaps || [],
+          atsKeywords: result.ats_keywords || [],
         });
         pageAnalyzed = true;
       } else if (response?.type === 'ERROR') {
@@ -219,34 +201,24 @@ function init() {
 // ─── Floating results panel ──────────────────────────────────────────
 
 interface PanelData {
-  method: string;
   job: any;
   score: number;
   pass: boolean;
-  matched: string[];
-  missing?: string[];
-  model?: string;
-  recommendation?: string;
-  base?: string;
-  baseReasoning?: string;
-  atsKeywords?: string[];
+  model: string;
+  recommendation: string;
+  base: string;
+  baseReasoning: string;
+  keyMatches: string[];
+  gaps: string[];
+  atsKeywords: string[];
 }
 
 function showResultsPanel(data: PanelData) {
-  // Remove existing panel
   document.getElementById('seer-results-panel')?.remove();
 
   const panel = document.createElement('div');
   panel.id = 'seer-results-panel';
 
-  const methodLabel: Record<string, string> = {
-    'json-ld': 'JSON-LD (structured)',
-    'embedded': 'Embedded data (<code>)',
-    'page-text': 'Page text',
-    'grok': 'Grok Analysis',
-  };
-
-  const isGrok = !!data.model;
   const recLabel: Record<string, string> = {
     'strong_yes': 'Strong Yes',
     'yes': 'Yes',
@@ -273,41 +245,35 @@ function showResultsPanel(data: PanelData) {
       </div>
 
       <div class="seer-panel-meta">
-        <span class="seer-panel-tag">${methodLabel[data.method] || data.method}</span>
-        <span class="seer-panel-tag ${!isGrok && !data.pass ? 'seer-panel-tag-local-fail' : ''}">${isGrok ? 'Deep Analysis' : 'Quick Fit (Local)'}</span>
-        ${data.recommendation ? `<span class="seer-panel-tag seer-panel-rec-${data.recommendation}">${recLabel[data.recommendation] || data.recommendation}</span>` : ''}
-        ${data.model ? `<span class="seer-panel-tag seer-panel-tag-model">${data.model}</span>` : ''}
+        <span class="seer-panel-tag seer-panel-rec-${data.recommendation}">${recLabel[data.recommendation] || data.recommendation}</span>
+        <span class="seer-panel-tag seer-panel-tag-model">${data.model}</span>
+      </div>
+
+      <div class="seer-panel-section">
+        <div class="seer-panel-section-title">Recommended Base</div>
+        <div class="seer-panel-section-body"><strong>${data.base}</strong> — ${esc(data.baseReasoning)}</div>
       </div>
   `;
 
-  if (data.base) {
+  if (data.keyMatches.length > 0) {
     html += `
       <div class="seer-panel-section">
-        <div class="seer-panel-section-title">Recommended Base</div>
-        <div class="seer-panel-section-body"><strong>${data.base}</strong>${data.baseReasoning ? ` — ${esc(data.baseReasoning)}` : ''}</div>
+        <div class="seer-panel-section-title">Key Matches (${data.keyMatches.length})</div>
+        <div class="seer-panel-tags">${data.keyMatches.map(s => `<span class="seer-panel-tag-match">${esc(s)}</span>`).join('')}</div>
       </div>
     `;
   }
 
-  if (data.matched.length > 0) {
+  if (data.gaps.length > 0) {
     html += `
       <div class="seer-panel-section">
-        <div class="seer-panel-section-title">${isGrok ? 'Key Matches' : 'Matches'} (${data.matched.length})</div>
-        <div class="seer-panel-tags">${data.matched.map(s => `<span class="seer-panel-tag-match">${esc(s)}</span>`).join('')}</div>
+        <div class="seer-panel-section-title">Gaps (${data.gaps.length})</div>
+        <div class="seer-panel-tags">${data.gaps.map(s => `<span class="seer-panel-tag-gap">${esc(s)}</span>`).join('')}</div>
       </div>
     `;
   }
 
-  if (data.missing && data.missing.length > 0) {
-    html += `
-      <div class="seer-panel-section">
-        <div class="seer-panel-section-title">${isGrok ? 'Gaps' : 'Missing'} (${data.missing.length})</div>
-        <div class="seer-panel-tags">${data.missing.map(s => `<span class="seer-panel-tag-gap">${esc(s)}</span>`).join('')}</div>
-      </div>
-    `;
-  }
-
-  if (data.atsKeywords && data.atsKeywords.length > 0) {
+  if (data.atsKeywords.length > 0) {
     html += `
       <div class="seer-panel-section">
         <div class="seer-panel-section-title">ATS Keywords</div>
@@ -316,7 +282,6 @@ function showResultsPanel(data: PanelData) {
     `;
   }
 
-  // Full job description with copy button
   if (data.job.description) {
     html += `
       <div class="seer-panel-section">
@@ -333,16 +298,13 @@ function showResultsPanel(data: PanelData) {
   panel.innerHTML = html;
   document.body.appendChild(panel);
 
-  // Animate in
   requestAnimationFrame(() => panel.classList.add('seer-panel-visible'));
 
-  // Close button
   document.getElementById('seer-panel-close')!.addEventListener('click', () => {
     panel.classList.remove('seer-panel-visible');
     setTimeout(() => panel.remove(), 300);
   });
 
-  // Copy JD button
   const copyBtn = document.getElementById('seer-copy-jd');
   if (copyBtn && data.job.description) {
     copyBtn.addEventListener('click', () => {
