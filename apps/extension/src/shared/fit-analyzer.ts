@@ -1,5 +1,7 @@
 import { callGemini } from './gemini-client.js';
 import type { JobData, ParsedProfile, FitAnalysis, BaseResumeSlug } from './types.js';
+import { getDefaultPrompt, interpolateTemplate } from './prompt-defaults.js';
+import { getSystemPrompts } from './storage.js';
 
 export interface DeepFitResult {
   analysis: FitAnalysis;
@@ -16,59 +18,35 @@ export async function deepFitAnalysis(
     throw new Error('Gemini API key not configured. Go to extension Options to set it.');
   }
 
-  const prompt = `You are The Seer, an expert resume strategist and job market analyst.
+  const overrides = await getSystemPrompts();
+  const template = overrides['gemini_fit_analysis'] || getDefaultPrompt('gemini_fit_analysis');
 
-Analyze this job against the candidate profile. Determine fit and select the optimal base resume.
+  const vars: Record<string, string> = {
+    skillsExpert: profile.skills_expert.join(', '),
+    skillsProficient: profile.skills_proficient.join(', '),
+    skillsFamiliar: profile.skills_familiar.join(', '),
+    experienceYears: String(profile.experience_years),
+    titlesHeld: profile.titles_held.join(', '),
+    targetTitles: profile.target_titles.join(', ') || 'Not specified',
+    dealBreakers: profile.deal_breakers.join(', ') || 'None specified',
+    jobTitle: job.title,
+    jobCompany: job.company,
+    jobLocation: job.location || 'Not specified',
+    jobType: job.job_type || 'Not specified',
+    jobSalary: job.salary_range || 'Not specified',
+    jobDescription: job.description,
+    jobRequirements: job.requirements.length > 0
+      ? `Requirements:\n${job.requirements.map(r => `- ${r}`).join('\n')}`
+      : '',
+    jobNiceToHaves: job.nice_to_haves.length > 0
+      ? `Nice to have:\n${job.nice_to_haves.map(r => `- ${r}`).join('\n')}`
+      : '',
+    baseSummaryGenAi: baseResumeSummaries.gen_ai,
+    baseSummaryMle: baseResumeSummaries.mle,
+    baseSummaryMix: baseResumeSummaries.mix,
+  };
 
-## Candidate Profile
-- Expert skills (core strengths): ${profile.skills_expert.join(', ')}
-- Proficient skills: ${profile.skills_proficient.join(', ')}
-- Familiar skills: ${profile.skills_familiar.join(', ')}
-- Experience: ${profile.experience_years} years
-- Past titles: ${profile.titles_held.join(', ')}
-- Target titles: ${profile.target_titles.join(', ') || 'Not specified'}
-- Deal-breakers: ${profile.deal_breakers.join(', ') || 'None specified'}
-
-## Job Description
-Title: ${job.title}
-Company: ${job.company}
-Location: ${job.location || 'Not specified'}
-Type: ${job.job_type || 'Not specified'}
-Salary: ${job.salary_range || 'Not specified'}
-
-${job.description}
-
-${job.requirements.length > 0 ? `Requirements:\n${job.requirements.map(r => `- ${r}`).join('\n')}` : ''}
-${job.nice_to_haves.length > 0 ? `Nice to have:\n${job.nice_to_haves.map(r => `- ${r}`).join('\n')}` : ''}
-
-## Base Resumes Available
-1. gen_ai - ${baseResumeSummaries.gen_ai}
-2. mle - ${baseResumeSummaries.mle}
-3. mix - ${baseResumeSummaries.mix}
-
-## Base Selection Strategy
-- Heavy LLM/GenAI/RAG/agents/prompting -> gen_ai
-- ML infra, pipelines, deployment, MLOps, computer vision, RL -> mle
-- Mixed signals or broad "AI/ML" role -> mix
-- GenAI title but heavy systems requirements -> mle (systems > title)
-- MLE title but heavy LLM requirements -> gen_ai (content > title)
-
-## Respond with ONLY valid JSON (no markdown fences):
-{
-  "fit_score": <0-100>,
-  "confidence": <0-100>,
-  "recommended_base": "<gen_ai|mle|mix>",
-  "base_reasoning": "<1-2 sentences on why this base>",
-  "key_matches": ["<matching skill/experience 1>", "..."],
-  "gaps": ["<missing requirement 1>", "..."],
-  "gap_mitigation": ["<how to frame gap 1 positively>", "..."],
-  "tailoring_priorities": ["<what to emphasize>", "..."],
-  "ats_keywords": ["<exact keywords from JD to include in resume>", "..."],
-  "red_flags": ["<concerns about the role>"],
-  "estimated_competition": "<low|medium|high>",
-  "apply_recommendation": "<strong_yes|yes|maybe|no>"
-}`;
-
+  const prompt = interpolateTemplate(template, vars);
   const { text, model } = await callGemini(apiKey, prompt);
   const cleaned = text.replace(/```json\n?|\n?```/g, '').trim();
 

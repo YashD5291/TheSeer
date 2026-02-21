@@ -47,3 +47,22 @@ export async function getEnabled(): Promise<boolean> {
 export async function setEnabled(enabled: boolean): Promise<void> {
   await chrome.storage.local.set({ seerEnabled: enabled });
 }
+
+// ─── System prompt overrides ──────────────────────────────────────────
+
+export async function getSystemPrompts(): Promise<Record<string, string>> {
+  const data: Record<string, any> = await chrome.storage.local.get('systemPrompts');
+  return (data.systemPrompts as Record<string, string>) || {};
+}
+
+export async function saveSystemPrompt(key: string, value: string): Promise<void> {
+  const current = await getSystemPrompts();
+  current[key] = value;
+  await chrome.storage.local.set({ systemPrompts: current });
+}
+
+export async function deleteSystemPrompt(key: string): Promise<void> {
+  const current = await getSystemPrompts();
+  delete current[key];
+  await chrome.storage.local.set({ systemPrompts: current });
+}

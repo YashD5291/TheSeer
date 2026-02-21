@@ -9,8 +9,8 @@
 
     body {
       font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-      background: #f9fafb;
-      color: #1e1b4b;
+      background: #f8f9fa;
+      color: #18181b;
       padding: 0;
     }
 
@@ -26,28 +26,29 @@
     }
 
     .header h1 {
-      font-size: 28px;
-      background: linear-gradient(135deg, #6366f1, #8b5cf6);
-      -webkit-background-clip: text;
-      -webkit-text-fill-color: transparent;
+      font-size: 24px;
+      font-weight: 700;
+      color: #18181b;
       margin-bottom: 4px;
     }
 
-    .header p { color: #6b7280; font-size: 14px; }
+    .header p { color: #71717a; font-size: 14px; }
 
     .card {
       background: white;
-      border-radius: 12px;
+      border-radius: 10px;
       padding: 24px;
-      margin-bottom: 20px;
-      box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+      margin-bottom: 16px;
+      border: 1px solid #e4e4e7;
     }
 
     .card h2 {
-      font-size: 16px;
+      font-size: 15px;
+      font-weight: 600;
       margin-bottom: 16px;
       padding-bottom: 12px;
-      border-bottom: 1px solid #f3f4f6;
+      border-bottom: 1px solid #f4f4f5;
+      color: #27272a;
     }
 
     .field {
@@ -58,7 +59,7 @@
       display: block;
       font-size: 13px;
       font-weight: 600;
-      color: #374151;
+      color: #3f3f46;
       margin-bottom: 6px;
     }
 
@@ -66,67 +67,75 @@
     .field input[type="password"] {
       width: 100%;
       padding: 10px 12px;
-      border: 1px solid #d1d5db;
+      border: 1px solid #d4d4d8;
       border-radius: 8px;
       font-size: 14px;
       font-family: monospace;
-      transition: border-color 0.2s;
+      transition: border-color 0.15s, box-shadow 0.15s;
+      background: #fafafa;
     }
 
     .field input:focus {
       outline: none;
-      border-color: #6366f1;
-      box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1);
+      border-color: #3f3f46;
+      box-shadow: 0 0 0 2px rgba(63, 63, 70, 0.08);
+      background: #fff;
     }
 
     .field .hint {
       font-size: 12px;
-      color: #9ca3af;
+      color: #a1a1aa;
       margin-top: 4px;
     }
 
+    .field .hint a {
+      color: #52525b;
+      text-decoration: underline;
+    }
+
     .file-upload {
-      border: 2px dashed #d1d5db;
+      border: 2px dashed #d4d4d8;
       border-radius: 8px;
       padding: 24px;
       text-align: center;
       cursor: pointer;
-      transition: border-color 0.2s, background 0.2s;
+      transition: border-color 0.15s, background 0.15s;
     }
 
     .file-upload:hover {
-      border-color: #6366f1;
-      background: #f5f3ff;
+      border-color: #a1a1aa;
+      background: #fafafa;
     }
 
     .file-upload p {
       font-size: 14px;
-      color: #6b7280;
+      color: #71717a;
       margin-bottom: 8px;
     }
 
     .file-upload .browse {
-      color: #6366f1;
+      color: #18181b;
       font-weight: 600;
       cursor: pointer;
+      text-decoration: underline;
     }
 
     .btn {
       padding: 10px 20px;
       border: none;
       border-radius: 8px;
-      font-size: 14px;
+      font-size: 13px;
       font-weight: 600;
       cursor: pointer;
-      transition: background 0.2s;
+      transition: background 0.15s;
     }
 
     .btn-primary {
-      background: linear-gradient(135deg, #6366f1, #8b5cf6);
+      background: #1a1a2e;
       color: white;
     }
 
-    .btn-primary:hover { background: linear-gradient(135deg, #4f46e5, #7c3aed); }
+    .btn-primary:hover { background: #2a2a42; }
 
     .btn-danger {
       background: #fef2f2;
@@ -145,22 +154,25 @@
     }
 
     .status-success {
-      background: #ecfdf5;
-      color: #065f46;
+      background: #f0fdf4;
+      color: #166534;
+      border: 1px solid #bbf7d0;
       display: block;
     }
 
     .status-error {
       background: #fef2f2;
       color: #991b1b;
+      border: 1px solid #fecaca;
       display: block;
     }
 
     .profile-summary {
-      background: #f9fafb;
+      background: #fafafa;
       border-radius: 8px;
       padding: 16px;
       margin-top: 12px;
+      border: 1px solid #e4e4e7;
     }
 
     .profile-summary .stat {
@@ -170,13 +182,154 @@
       font-size: 13px;
     }
 
-    .profile-summary .stat-label { color: #6b7280; }
-    .profile-summary .stat-value { font-weight: 600; }
+    .profile-summary .stat-label { color: #71717a; }
+    .profile-summary .stat-value { font-weight: 600; color: #27272a; }
 
     .actions {
       display: flex;
       gap: 12px;
       margin-top: 16px;
+    }
+
+    /* ─── Prompt management ──────────────────────────── */
+    .prompts-section h2 {
+      font-size: 15px;
+      font-weight: 600;
+      margin-bottom: 16px;
+      padding-bottom: 12px;
+      border-bottom: 1px solid #f4f4f5;
+      color: #27272a;
+    }
+
+    .prompt-card {
+      background: #fafafa;
+      border: 1px solid #e4e4e7;
+      border-radius: 8px;
+      padding: 16px;
+      margin-bottom: 12px;
+    }
+
+    .prompt-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      margin-bottom: 8px;
+    }
+
+    .prompt-title {
+      font-size: 13px;
+      font-weight: 600;
+      color: #27272a;
+    }
+
+    .prompt-category {
+      font-size: 11px;
+      font-weight: 500;
+      padding: 2px 8px;
+      border-radius: 4px;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+
+    .prompt-category-system {
+      background: #f0fdf4;
+      color: #166534;
+    }
+
+    .prompt-category-claude {
+      background: #faf5ff;
+      color: #7c3aed;
+    }
+
+    .prompt-description {
+      font-size: 12px;
+      color: #71717a;
+      margin-bottom: 10px;
+    }
+
+    .prompt-textarea {
+      width: 100%;
+      min-height: 96px;
+      padding: 10px 12px;
+      border: 1px solid #d4d4d8;
+      border-radius: 6px;
+      font-size: 12px;
+      font-family: 'SF Mono', 'Fira Code', monospace;
+      line-height: 1.5;
+      resize: vertical;
+      background: #fff;
+      color: #27272a;
+      transition: border-color 0.15s;
+    }
+
+    .prompt-textarea:read-only {
+      background: #f4f4f5;
+      color: #52525b;
+      cursor: default;
+      max-height: 96px;
+      overflow: hidden;
+    }
+
+    .prompt-textarea:not(:read-only) {
+      min-height: 240px;
+      max-height: none;
+    }
+
+    .prompt-textarea:focus {
+      outline: none;
+      border-color: #3f3f46;
+      box-shadow: 0 0 0 2px rgba(63, 63, 70, 0.08);
+    }
+
+    .prompt-actions {
+      display: flex;
+      gap: 8px;
+      margin-top: 10px;
+    }
+
+    .prompt-actions .btn {
+      padding: 6px 14px;
+      font-size: 12px;
+    }
+
+    .btn-secondary {
+      background: #f4f4f5;
+      color: #3f3f46;
+      border: 1px solid #d4d4d8;
+    }
+
+    .btn-secondary:hover { background: #e4e4e7; }
+
+    .prompt-vars {
+      font-size: 11px;
+      color: #a1a1aa;
+      margin-top: 8px;
+      line-height: 1.6;
+    }
+
+    .prompt-vars code {
+      background: #f4f4f5;
+      padding: 1px 5px;
+      border-radius: 3px;
+      font-size: 10px;
+    }
+
+    .prompt-empty {
+      font-size: 12px;
+      font-style: italic;
+      color: #a1a1aa;
+      padding: 12px;
+      text-align: center;
+    }
+
+    .prompt-modified-badge {
+      font-size: 10px;
+      font-weight: 500;
+      padding: 1px 6px;
+      border-radius: 3px;
+      background: #fef3c7;
+      color: #92400e;
+      margin-left: 8px;
     }
   </style>
 </head>
@@ -184,7 +337,7 @@
   <div class="container">
     <div class="header">
       <h1>The Seer</h1>
-      <p>Configure your AI resume fit checker</p>
+      <p>Configure your resume fit checker</p>
     </div>
 
     <div class="card">
@@ -200,7 +353,7 @@
 
     <div class="card">
       <h2>Profile Import</h2>
-      <p style="font-size: 13px; color: #6b7280; margin-bottom: 16px;">
+      <p style="font-size: 13px; color: #71717a; margin-bottom: 16px;">
         Import your profile from the CLI: run <code>pnpm seer export</code> to generate the JSON file.
       </p>
 
@@ -217,11 +370,19 @@
     <div class="card">
       <h2>Current Profile</h2>
       <div id="current-profile">
-        <p style="font-size: 14px; color: #9ca3af;">No profile loaded.</p>
+        <p style="font-size: 14px; color: #a1a1aa;">No profile loaded.</p>
       </div>
       <div class="actions" id="profile-actions" style="display: none;">
         <button class="btn btn-danger" id="clear-profile">Clear Profile</button>
       </div>
+    </div>
+
+    <div class="card prompts-section">
+      <h2>Prompt Templates</h2>
+      <p style="font-size: 13px; color: #71717a; margin-bottom: 16px;">
+        Customize the prompts sent to each LLM. System prompts use <code>{{variable}}</code> placeholders that are filled at runtime.
+      </p>
+      <div id="prompts-list"></div>
     </div>
   </div>
 

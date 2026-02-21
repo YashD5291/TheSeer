@@ -1,5 +1,7 @@
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import type { JobData, ParsedProfile, FitAnalysis, BaseResumeSlug } from './types.js';
+import { getDefaultPrompt, interpolateTemplate } from './prompt-defaults.js';
+import { getSystemPrompts } from './storage.js';
 
 // Ordered by preference: quality first, then fast fallbacks
 const MODELS = [
@@ -103,70 +105,29 @@ export async function extractAndAnalyze(params: {
 }): Promise<CombinedResult> {
   const { rawText, jsonLd, profile, baseResumeSummaries, apiKey, url, pageTitle } = params;
 
-  const prompt = `You are The Seer, an expert resume strategist and job market analyst.
+  const overrides = await getSystemPrompts();
+  const template = overrides['gemini_extraction'] || getDefaultPrompt('gemini_extraction');
 
-Given the following page content from a job posting, perform TWO tasks in a single response:
-1. EXTRACT structured job data from the content. CRITICAL: The "description" field must be the ORIGINAL job description copied VERBATIM from the posting. Only strip surrounding site noise (nav, sidebar, footer, other job listings). Do NOT rephrase, summarize, or rewrite any part of the JD.
-2. ANALYZE fit against the candidate profile and select the optimal base resume
+  const vars: Record<string, string> = {
+    url,
+    pageTitle,
+    jsonLdSection: jsonLd
+      ? `\n## Structured Data (JSON-LD - HIGH TRUST, prefer this over raw text)\n${JSON.stringify(jsonLd, null, 2)}\n`
+      : '',
+    rawText: rawText.slice(0, 15000),
+    skillsExpert: profile.skills_expert.join(', '),
+    skillsProficient: profile.skills_proficient.join(', '),
+    skillsFamiliar: profile.skills_familiar.join(', '),
+    experienceYears: String(profile.experience_years),
+    titlesHeld: profile.titles_held.join(', '),
+    targetTitles: profile.target_titles.join(', ') || 'Not specified',
+    dealBreakers: profile.deal_breakers.join(', ') || 'None specified',
+    baseSummaryGenAi: baseResumeSummaries.gen_ai,
+    baseSummaryMle: baseResumeSummaries.mle,
+    baseSummaryMix: baseResumeSummaries.mix,
+  };
 
-## Page Information
-URL: ${url}
-Page Title: ${pageTitle}
-${jsonLd ? `\n## Structured Data (JSON-LD - HIGH TRUST, prefer this over raw text)\n${JSON.stringify(jsonLd, null, 2)}\n` : ''}
-## Page Content (cleaned HTML — use the semantic structure to identify sections)
-${rawText.slice(0, 15000)}
-
-## Candidate Profile
-- Expert skills (core strengths): ${profile.skills_expert.join(', ')}
-- Proficient skills: ${profile.skills_proficient.join(', ')}
-- Familiar skills: ${profile.skills_familiar.join(', ')}
-- Experience: ${profile.experience_years} years
-- Past titles: ${profile.titles_held.join(', ')}
-- Target titles: ${profile.target_titles.join(', ') || 'Not specified'}
-- Deal-breakers: ${profile.deal_breakers.join(', ') || 'None specified'}
-
-## Base Resumes Available
-1. gen_ai - ${baseResumeSummaries.gen_ai}
-2. mle - ${baseResumeSummaries.mle}
-3. mix - ${baseResumeSummaries.mix}
-
-## Base Selection Strategy
-- Heavy LLM/GenAI/RAG/agents/prompting -> gen_ai
-- ML infra, pipelines, deployment, MLOps, computer vision, RL -> mle
-- Mixed signals or broad "AI/ML" role -> mix
-- GenAI title but heavy systems requirements -> mle (systems > title)
-- MLE title but heavy LLM requirements -> gen_ai (content > title)
-
-## Respond with ONLY valid JSON (no markdown fences):
-{
-  "job": {
-    "title": "<extracted job title>",
-    "company": "<company name>",
-    "url": "${url}",
-    "location": "<location or null>",
-    "salary_range": "<salary range or null>",
-    "job_type": "<full-time/contract/etc or null>",
-    "description": "<EXACT original job description text, copied verbatim from the posting. Remove ONLY site noise (navigation, sidebar jobs, footer, ads). Do NOT rephrase, summarize, or alter the JD in any way.>",
-    "requirements": ["<requirement 1>", "..."],
-    "nice_to_haves": ["<nice to have 1>", "..."],
-    "platform": "gemini-extracted"
-  },
-  "analysis": {
-    "fit_score": <0-100>,
-    "confidence": <0-100>,
-    "recommended_base": "<gen_ai|mle|mix>",
-    "base_reasoning": "<1-2 sentences on why this base>",
-    "key_matches": ["<matching skill/experience 1>", "..."],
-    "gaps": ["<missing requirement 1>", "..."],
-    "gap_mitigation": ["<how to frame gap 1 positively>", "..."],
-    "tailoring_priorities": ["<what to emphasize>", "..."],
-    "ats_keywords": ["<exact keywords from JD to include in resume>", "..."],
-    "red_flags": ["<concerns about the role>"],
-    "estimated_competition": "<low|medium|high>",
-    "apply_recommendation": "<strong_yes|yes|maybe|no>"
-  }
-}`;
-
+  const prompt = interpolateTemplate(template, vars);
   const { text, model } = await callGemini(apiKey, prompt);
   const parsed = parseGeminiJson(text);
 

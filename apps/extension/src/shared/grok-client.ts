@@ -5,6 +5,8 @@
  */
 
 import type { JobData, ParsedProfile, FitAnalysis, BaseResumeSlug } from './types.js';
+import { getDefaultPrompt, interpolateTemplate } from './prompt-defaults.js';
+import { getSystemPrompts } from './storage.js';
 
 export interface GrokResponse {
   text: string;
@@ -290,54 +292,27 @@ export async function extractAndAnalyzeViaGrok(params: {
 }): Promise<CombinedResult> {
   const { rawText, jsonLd, profile, baseResumeSummaries, url, pageTitle } = params;
 
-  const prompt = `You are The Seer, an expert resume strategist. Analyze this job posting and respond in EXACTLY the format below. Each field must be on its own line. Do not add any other text.
+  const overrides = await getSystemPrompts();
+  const template = overrides['grok_extraction'] || getDefaultPrompt('grok_extraction');
 
-===PAGE===
-URL: ${url}
-Title: ${pageTitle}
-${jsonLd ? `JSON-LD: ${JSON.stringify(jsonLd).slice(0, 2000)}` : ''}
+  const vars: Record<string, string> = {
+    url,
+    pageTitle,
+    jsonLdSection: jsonLd ? `JSON-LD: ${JSON.stringify(jsonLd).slice(0, 2000)}` : '',
+    rawText: rawText.slice(0, 12000),
+    skillsExpert: profile.skills_expert.join(', '),
+    skillsProficient: profile.skills_proficient.join(', '),
+    skillsFamiliar: profile.skills_familiar.join(', '),
+    experienceYears: String(profile.experience_years),
+    titlesHeld: profile.titles_held.join(', '),
+    targetTitles: profile.target_titles.join(', ') || 'Any',
+    dealBreakers: profile.deal_breakers.join(', ') || 'None',
+    baseSummaryGenAi: baseResumeSummaries.gen_ai,
+    baseSummaryMle: baseResumeSummaries.mle,
+    baseSummaryMix: baseResumeSummaries.mix,
+  };
 
-===CONTENT===
-${rawText.slice(0, 12000)}
-
-===PROFILE===
-Expert: ${profile.skills_expert.join(', ')}
-Proficient: ${profile.skills_proficient.join(', ')}
-Familiar: ${profile.skills_familiar.join(', ')}
-Experience: ${profile.experience_years} years
-Past titles: ${profile.titles_held.join(', ')}
-Target titles: ${profile.target_titles.join(', ') || 'Any'}
-Deal-breakers: ${profile.deal_breakers.join(', ') || 'None'}
-
-===BASES===
-gen_ai: ${baseResumeSummaries.gen_ai}
-mle: ${baseResumeSummaries.mle}
-mix: ${baseResumeSummaries.mix}
-Pick gen_ai for LLM/GenAI/RAG roles, mle for ML infra/pipelines/MLOps, mix for broad AI/ML.
-
-===RESPOND EXACTLY LIKE THIS===
-JOB_TITLE: <title>
-COMPANY: <company>
-LOCATION: <location or Unknown>
-SALARY: <salary or Unknown>
-JOB_TYPE: <full-time/contract/etc or Unknown>
-DESCRIPTION: <copy the FULL original job description verbatim, only remove nav/footer noise>
-===END_DESCRIPTION===
-REQUIREMENTS: <req1> | <req2> | <req3>
-NICE_TO_HAVES: <nice1> | <nice2>
-FIT_SCORE: <0-100>
-CONFIDENCE: <0-100>
-RECOMMENDED_BASE: <gen_ai or mle or mix>
-BASE_REASONING: <1-2 sentences>
-KEY_MATCHES: <match1> | <match2> | <match3>
-GAPS: <gap1> | <gap2>
-GAP_MITIGATION: <mitigation1> | <mitigation2>
-TAILORING_PRIORITIES: <priority1> | <priority2>
-ATS_KEYWORDS: <keyword1> | <keyword2> | <keyword3>
-RED_FLAGS: <flag1> | <flag2>
-COMPETITION: <low or medium or high>
-RECOMMENDATION: <strong_yes or yes or maybe or no>`;
-
+  const prompt = interpolateTemplate(template, vars);
   const { text } = await callGrok(prompt);
   const parsed = parseGrokTextResponse(text, url);
   return { ...parsed, model: 'grok-chat' };
