@@ -22,6 +22,12 @@ const entries = [
     format: 'iife',
   },
   {
+    entryPoints: ['src/claude-hook/index.ts'],
+    outfile: 'dist/claude-hook.js',
+    // MAIN world content script — must be IIFE
+    format: 'iife',
+  },
+  {
     entryPoints: ['src/popup/index.ts'],
     outfile: 'dist/popup.js',
   },
