@@ -1,0 +1,325 @@
+\documentclass[10pt, letterpaper]{article}
+
+% ================================
+% PACKAGES
+% ================================
+\usepackage[
+    ignoreheadfoot,
+    top=1.8cm,
+    bottom=1.8cm,
+    left=1.8cm,
+    right=1.8cm,
+    footskip=1.0cm,
+]{geometry}
+
+\usepackage{titlesec}
+\usepackage{tabularx}
+\usepackage{array}
+\usepackage[dvipsnames]{xcolor}
+\usepackage{enumitem}
+\usepackage{fontawesome5}
+\usepackage{amsmath}
+\usepackage[
+    pdfauthor={Juan Flores},
+    colorlinks=true,
+    urlcolor=black
+]{hyperref}
+\usepackage[pscoord]{eso-pic}
+\usepackage{calc}
+\usepackage{bookmark}
+\usepackage{lastpage}
+\usepackage{changepage}
+\usepackage{paracol}
+\usepackage{ifthen}
+\usepackage{needspace}
+\usepackage{iftex}
+
+% ================================
+% FONT CONFIGURATION
+% ================================
+\ifPDFTeX
+    \input{glyphtounicode}
+    \pdfgentounicode=1
+    \usepackage[T1]{fontenc}
+    \usepackage[utf8]{inputenc}
+    \usepackage{lmodern}
+    \usepackage{charter} % Professional font (Type1)
+\else
+    \usepackage{fontspec}
+    \setmainfont{Charter} % Professional font (system TTF for XeTeX/tectonic)
+\fi
+
+% ================================
+% DOCUMENT SETTINGS
+% ================================
+\pagestyle{empty} % No header or footer
+\setcounter{secnumdepth}{0} % No section numbering
+\setlength{\parindent}{0pt} % No paragraph indentation
+\setlength{\topskip}{0pt}
+\setlength{\columnsep}{0.15cm}
+\pagenumbering{gobble}
+\AtBeginEnvironment{adjustwidth}{\partopsep0pt}
+
+% ================================
+% SECTION FORMATTING
+% ================================
+\titleformat{\section}{
+    \needspace{4\baselineskip}
+    \bfseries
+    \large
+}{}{0pt}{}[\vspace{2pt}\titlerule]
+
+\titlespacing{\section}{
+    -1pt    % left space
+}{
+    0.3cm   % top space
+}{
+    0.25cm  % bottom space
+}
+
+% ================================
+% CUSTOM BULLET POINTS
+% ================================
+\renewcommand\labelitemi{$\vcenter{\hbox{\small$\bullet$}}$}
+
+% ================================
+% CUSTOM ENVIRONMENTS
+% ================================
+
+% Environment for bullet points in experience
+\newenvironment{highlights}{
+    \begin{itemize}[
+        topsep=0.10cm,
+        parsep=0.10cm,
+        partopsep=0pt,
+        itemsep=0.05cm,
+        leftmargin=20pt
+    ]
+}{
+    \end{itemize}
+}
+
+% Environment for one column entries
+\newenvironment{onecolentry}{
+    \begin{adjustwidth}{0cm + 0.00001cm}{0cm + 0.00001cm}
+}{
+    \end{adjustwidth}
+}
+
+% Environment for two column entries (used in experience)
+\newenvironment{twocolentry}[2][]{
+    \onecolentry
+    \def\secondColumn{#2}
+    \setcolumnwidth{\fill, 4.5cm}
+    \begin{paracol}{2}
+}{
+    \switchcolumn
+    \raggedleft
+    \secondColumn
+    \end{paracol}
+    \endonecolentry
+}
+
+% Environment for the header
+\newenvironment{header}{
+    \setlength{\topsep}{0pt}
+    \par\kern\topsep
+    \centering
+    \linespread{1.2}
+}{
+    \par\kern\topsep
+}
+
+% ================================
+% CUSTOM COMMANDS
+% ================================
+\newcommand{\experienceSeparator}{\vspace{0.35cm}} % Increased spacing between companies
+
+% Save the original href command
+\let\hrefWithoutArrow\href
+
+% ================================
+% DOCUMENT CONTENT
+% ================================
+\begin{document}
+
+    % Header separator
+    \newcommand{\AND}{\unskip
+        \cleaders\copy\ANDbox\hskip\wd\ANDbox
+        \ignorespaces
+    }
+    \newsavebox\ANDbox
+    \sbox\ANDbox{$|$}
+
+    % ================================
+    % HEADER SECTION
+    % ================================
+    \begin{header}
+        \fontsize{22pt}{22pt}\selectfont
+        \textbf{Juan Flores}
+
+        \vspace{6pt}
+
+        \normalsize
+        {\hrefWithoutArrow{mailto:juanflores.work@outlook.com}{juanflores.work@outlook.com}}
+        {|}
+        {\hrefWithoutArrow{tel:+1-704-363-9900}{+1 (704) 363-9900}}
+
+        {\hrefWithoutArrow{https://linkedin.com/in/juan-flores-ml}{linkedin.com/in/juan-flores-ml}}
+        {|}
+        {\hrefWithoutArrow{https://github.com/juanf-0gravity}{github.com/juanf-0gravity}}
+    \end{header}
+
+    \vspace{0.3cm}
+
+    \begin{onecolentry}
+        Machine Learning Engineer with 7+ years building production systems and 3+ years shipping AI-powered product features end-to-end. Deep expertise in LLMs, prompt engineering, RAG, and evaluation methods, with a track record of iteratively improving GenAI features using quantitative and qualitative signals. Experienced supporting on-call production workloads and implementing observability (New Relic, Datadog). Proven cross-functional collaborator who thrives in ambiguity, shipping reliable AI features at Covariant (RFM-1) and Labelbox (Model Foundry). Driven by first principles thinking to deliver user-facing impact.
+    \end{onecolentry}
+
+    % ================================
+    % SKILLS
+    % ================================
+    \section{Skills}
+
+    \begin{onecolentry}
+        \textbf{LLM \& GenAI:} Prompt Engineering, RAG, Evaluation Methods, RLHF, DPO, Knowledge Distillation, PEFT/LoRA
+    \end{onecolentry}
+
+    \vspace{0.15cm}
+
+    \begin{onecolentry}
+        \textbf{ML Frameworks:} PyTorch, JAX, Transformers, Hugging Face, Triton
+    \end{onecolentry}
+
+    \vspace{0.15cm}
+
+    \begin{onecolentry}
+        \textbf{Inference \& Serving:} vLLM, TensorRT-LLM, Triton Server, ONNX, BentoML, Ray Serve
+    \end{onecolentry}
+
+    \vspace{0.15cm}
+
+    \begin{onecolentry}
+        \textbf{Training \& Scale:} DeepSpeed, FSDP, Mixed Precision, Multi-GPU, Model Parallelism
+    \end{onecolentry}
+
+    \vspace{0.15cm}
+
+    \begin{onecolentry}
+        \textbf{Backend \& Data:} Python, Go, SQL, Kafka, Spark, Redis, Vector DBs (FAISS, Pinecone, Weaviate)
+    \end{onecolentry}
+
+    \vspace{0.15cm}
+
+    \begin{onecolentry}
+        \textbf{Production \& Observability:} New Relic, Datadog, Weights \& Biases, MLflow, Docker, Kubernetes, CI/CD, A/B Testing
+    \end{onecolentry}
+
+    % ================================
+    % EXPERIENCE
+    % ================================
+    \section{Experience}
+
+    % Company 1: Labelbox
+    \begin{twocolentry}{
+        Jun 2024 -- Oct 2025
+    }
+        \textbf{Senior AI Engineer} | Labelbox -- Remote (San Francisco, CA)
+    \end{twocolentry}
+
+    \vspace{0.10cm}
+    \begin{onecolentry}
+        \begin{highlights}
+            \item Owned end-to-end development of Model Foundry's LLM-powered labeling features, from prototype to production, designing multi-model routing across GPT-4, Claude, and Gemini based on task type, cost, and latency requirements.
+            \item Iterated on GenAI feature quality through RLHF loops using human preference ranking, implementing evaluation strategies that reduced hallucination rates by 40\% in production workflows for enterprise clients including Genentech and P\&G.
+            \item Built evaluation infrastructure for multi-turn conversations and rubric-based assessment, enabling quantitative quality metrics (inter-rater reliability, agreement scores) that drove iterative model improvements.
+            \item Collaborated cross-functionally with domain experts and product stakeholders to design AI-driven experiences, managing workforce quality systems that matched 500+ evaluators to specialized tasks based on expertise and performance signals.
+            \item Optimized LLM inference with vLLM and TensorRT on A100 clusters, achieving sub-second responses while meeting production reliability and GDPR constraints for large-scale enterprise deployments.
+        \end{highlights}
+    \end{onecolentry}
+
+    \experienceSeparator
+
+    % Company 2: Covariant
+    \begin{twocolentry}{
+        Jan 2022 -- May 2024
+    }
+        \textbf{Machine Learning Engineer} | Covariant -- Remote (Berkeley, CA)
+    \end{twocolentry}
+
+    \vspace{0.10cm}
+    \begin{onecolentry}
+        \begin{highlights}
+            \item Shipped RFM-1 (Robotics Foundation Model) end-to-end, an 8B-parameter multimodal transformer, leading training infrastructure on 128 A100 GPUs using PyTorch FSDP and collaborating across teams to deploy to production warehouse environments.
+            \item Improved model reliability through RLHF fine-tuning on fleet-collected data from Otto Group and McKesson deployments, using evaluation loops with human preference feedback to achieve 20\% higher accuracy in zero-shot scenarios.
+            \item Designed experiment frameworks for model evaluation, implementing in-context learning capabilities that enabled rapid adaptation to novel objects without retraining, validated through systematic A/B comparisons across deployment sites.
+            \item Optimized production serving with Triton Server and TensorRT quantization, supporting on-call reliability for edge deployments processing real-time robotic decisions at sub-100ms latency.
+            \item Developed physics prediction features using diffusion models, iterating through fast feedback loops with warehouse operators to align model behavior with user expectations via constitutional AI principles.
+        \end{highlights}
+    \end{onecolentry}
+
+    \experienceSeparator
+
+    % Company 3: Rockset
+    \begin{twocolentry}{
+        Jun 2020 -- Dec 2021
+    }
+        \textbf{Data Engineer} | Rockset (acquired by OpenAI 2024) -- Remote (San Mateo, CA)
+    \end{twocolentry}
+
+    \vspace{0.10cm}
+    \begin{onecolentry}
+        \begin{highlights}
+            \item Built real-time data pipelines using Kafka and Spark for production analytics, enabling sub-millisecond querying through Converged Index architecture serving customers like JetBlue and Klarna.
+            \item Integrated vector search capabilities using FAISS and HNSW graphs, implementing retrieval infrastructure that supported similarity queries on embeddings at scale.
+            \item Contributed to schema inference systems handling dynamic JSON documents, supporting reliable analytics on semi-structured data from MongoDB CDC and DynamoDB streams.
+            \item Supported production reliability through distributed query system troubleshooting and automated scaling, maintaining high uptime for customer-facing workloads. (Rockset acquired by OpenAI in 2024 for retrieval infrastructure.)
+        \end{highlights}
+    \end{onecolentry}
+
+    \experienceSeparator
+
+    % Company 4: AvidXchange
+    \begin{twocolentry}{
+        Jun 2018 -- May 2020
+    }
+        \textbf{Backend Engineer} | AvidXchange -- Charlotte, NC
+    \end{twocolentry}
+
+    \vspace{0.10cm}
+    \begin{onecolentry}
+        \begin{highlights}
+            \item Developed Python APIs for transaction automation handling 200K+ daily operations, implementing observability with New Relic and Datadog to identify bottlenecks and support on-call production reliability.
+            \item Led performance optimization initiative reducing month-end processing from 8 hours to 3 hours through comprehensive monitoring, profiling, and iterative improvements to caching and database queries.
+            \item Optimized OCR processing backends with Redis caching and ML-based auto-coding, reducing invoice-to-payment delays by 25\% through systematic experimentation and measurement.
+            \item Collaborated cross-functionally with operations teams, shadowing users to understand pain points and translating insights into technical solutions that improved vendor satisfaction scores by 35\%.
+        \end{highlights}
+    \end{onecolentry}
+
+    \section{Education}
+
+    \begin{twocolentry}{
+        May 2018
+    }
+        \textbf{University of North Carolina at Charlotte}
+    \end{twocolentry}
+
+    \vspace{0.10cm}
+    \begin{onecolentry}
+        Master of Science, Computer Science (Focus: Machine Learning, Distributed Systems, NLP, CV)
+    \end{onecolentry}
+
+    \vspace{0.20cm}
+
+    \begin{twocolentry}{
+        May 2016
+    }
+        \textbf{University of North Carolina at Charlotte}
+    \end{twocolentry}
+
+    \vspace{0.10cm}
+    \begin{onecolentry}
+        Bachelor of Science, Computer Science (Major: Software Engineering)
+    \end{onecolentry}
+
+\end{document}
