@@ -133,17 +133,23 @@ cd apps/resume-gen
 bun run build.ts
 ```
 
-Run the installer:
+Run the installer — you must specify where generated resumes should be saved:
 
 ```bash
 # From the extracted archive or build output:
-./dist/theseer-pdf-macos-arm64/install.sh YOUR_EXTENSION_ID
+./theseer-pdf --setup YOUR_EXTENSION_ID --output-dir ~/Resumes
 
-# Or run setup directly:
-./theseer-pdf --setup YOUR_EXTENSION_ID
+# Or via the install script:
+./dist/theseer-pdf-macos-arm64/install.sh YOUR_EXTENSION_ID
 ```
 
 This installs to `~/.theseer/` and registers the Chrome native messaging host.
+
+Change the output directory anytime:
+
+```bash
+theseer-pdf --set-output ~/Desktop/Resumes
+```
 
 **Restart Chrome** after installation.
 
