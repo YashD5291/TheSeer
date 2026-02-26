@@ -6,8 +6,9 @@ export function buildClaudePrompt(params: {
   analysis: FitAnalysis;
   promptTemplate: string;
   selectedBase: BaseResumeSlug;
+  includeContext?: boolean;
 }): string {
-  const { job, analysis, promptTemplate } = params;
+  const { job, analysis, promptTemplate, includeContext = true } = params;
 
   const jdMarker = '## JOB DESCRIPTION:';
   const inputsEnd = '</inputs>';
@@ -16,14 +17,16 @@ export function buildClaudePrompt(params: {
   const inputsEndIdx = promptTemplate.indexOf(inputsEnd, jdIdx > -1 ? jdIdx : 0);
 
   if (jdIdx === -1 || inputsEndIdx === -1) {
-    return promptTemplate + formatJDSection(job) + formatStrategicContext(analysis);
+    let prompt = promptTemplate + formatJDSection(job);
+    if (includeContext) prompt += formatStrategicContext(analysis);
+    return prompt;
   }
 
   const before = promptTemplate.slice(0, jdIdx + jdMarker.length);
   const after = promptTemplate.slice(inputsEndIdx);
 
   let prompt = `${before}\n${formatJobDescription(job)}\n${after}`;
-  prompt += formatStrategicContext(analysis);
+  if (includeContext) prompt += formatStrategicContext(analysis);
 
   return prompt;
 }

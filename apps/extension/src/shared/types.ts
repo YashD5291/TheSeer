@@ -67,6 +67,10 @@ export interface SeerSettings {
   profile: ParsedProfile | null;
   baseResumeSummaries: Record<BaseResumeSlug, string>;
   prompts: Record<BaseResumeSlug, string>;
+  grokModel: string;
+  claudeModel: string;
+  claudeExtendedThinking: boolean;
+  seerContext: boolean;
 }
 
 export interface ScrapedJob {
@@ -87,4 +91,7 @@ export type MessageType =
   | { type: 'GET_CURRENT_JOB' }
   | { type: 'CURRENT_JOB_RESULT'; data: ScrapedJob | null }
   | { type: 'GET_JOB_FOR_TAB'; tabId: number }
+  | { type: 'SEER_PDF_READY'; pdfPath: string; folderName: string }
+  | { type: 'SEER_PDF_ERROR'; error: string }
+  | { type: 'SEER_OPEN_PDF'; pdfPath: string }
   | { type: 'ERROR'; message: string };

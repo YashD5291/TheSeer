@@ -6,19 +6,51 @@ const DEFAULT_SUMMARIES = {
   mix: 'Generalist: combines GenAI + MLE strengths, full-stack ML from foundation models to edge deployment, broadest skill coverage',
 };
 
+export const DEFAULT_GROK_MODEL = 'Fast';
+export const DEFAULT_CLAUDE_MODEL = 'Sonnet 4.5';
+
 export async function getSettings(): Promise<SeerSettings> {
   const data: Record<string, any> = await chrome.storage.local.get([
     'geminiApiKey',
     'profile',
     'baseResumeSummaries',
     'prompts',
+    'grokModel',
+    'claudeModel',
+    'claudeExtendedThinking',
+    'seerContext',
   ]);
   return {
     geminiApiKey: (data.geminiApiKey as string) || '',
     profile: data.profile || null,
     baseResumeSummaries: data.baseResumeSummaries || DEFAULT_SUMMARIES,
     prompts: data.prompts || { gen_ai: '', mle: '', mix: '' },
+    grokModel: (data.grokModel as string) || DEFAULT_GROK_MODEL,
+    claudeModel: (data.claudeModel as string) || DEFAULT_CLAUDE_MODEL,
+    claudeExtendedThinking: data.claudeExtendedThinking === true, // default off
+    seerContext: data.seerContext === true, // default off
   };
+}
+
+export interface ModelPrefs {
+  grokModel: string;
+  claudeModel: string;
+  claudeExtendedThinking: boolean;
+  seerContext: boolean;
+}
+
+export async function getModelPrefs(): Promise<ModelPrefs> {
+  const data: Record<string, any> = await chrome.storage.local.get(['grokModel', 'claudeModel', 'claudeExtendedThinking', 'seerContext']);
+  return {
+    grokModel: (data.grokModel as string) || DEFAULT_GROK_MODEL,
+    claudeModel: (data.claudeModel as string) || DEFAULT_CLAUDE_MODEL,
+    claudeExtendedThinking: data.claudeExtendedThinking === true,
+    seerContext: data.seerContext === true, // default off
+  };
+}
+
+export async function saveModelPrefs(prefs: ModelPrefs): Promise<void> {
+  await chrome.storage.local.set(prefs);
 }
 
 export async function saveSettings(settings: Partial<SeerSettings>): Promise<void> {
