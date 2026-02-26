@@ -4,13 +4,25 @@ import { buildClaudePrompt } from '../shared/prompt-builder.js';
 import { submitPromptToClaude } from '../shared/claude-client.js';
 import type { ScrapedJob, MessageType } from '../shared/types.js';
 
+const NATIVE_HOST = 'com.theseer.resumegen';
+
 // Handle messages from content script and popup
 chrome.runtime.onMessage.addListener((message: MessageType, sender, sendResponse) => {
   // Grok/Claude automation results are handled by one-time listeners — skip here
   if ((message as any).type === 'SEER_GROK_RESULT') return;
   if ((message as any).type === 'SEER_CLAUDE_RESULT') return;
+  if ((message as any).type === 'SEER_CLAUDE_RESPONSE_READY') return;
   // Toggle messages are handled by content script directly
   if ((message as any).type === 'SEER_TOGGLE') return;
+
+  // Open PDF in a new tab
+  if ((message as any).type === 'SEER_OPEN_PDF') {
+    const pdfPath = (message as any).pdfPath as string;
+    if (pdfPath) {
+      chrome.tabs.create({ url: `file://${pdfPath}` });
+    }
+    return;
+  }
 
   const tabId = sender.tab?.id;
   handleMessage(message, tabId).then(sendResponse).catch(err => {
@@ -99,6 +111,7 @@ async function handleMessage(message: MessageType, senderTabId?: number): Promis
           analysis: combined.analysis,
           promptTemplate,
           selectedBase: combined.analysis.recommended_base,
+          includeContext: settings.seerContext,
         });
         console.log(`[Seer BG] Auto-built Claude prompt (${claudePrompt.length} chars, base: ${combined.analysis.recommended_base})`);
       } else {
@@ -123,15 +136,19 @@ async function handleMessage(message: MessageType, senderTabId?: number): Promis
 
       // Fire off Claude submission (non-blocking)
       if (claudePrompt && senderTabId != null) {
-        const tid = senderTabId;
-        submitPromptToClaude(claudePrompt)
-          .then(() => {
-            console.log('[Seer BG] Claude prompt submitted successfully');
-            chrome.tabs.sendMessage(tid, { type: 'SEER_CLAUDE_DONE' }).catch(() => {});
+        const jdTabId = senderTabId;
+        const jobCompany = combined.job.company;
+        const jobTitle = combined.job.title;
+        submitPromptToClaude(claudePrompt, settings.claudeModel, settings.claudeExtendedThinking)
+          .then((claudeTabId) => {
+            console.log(`[Seer BG] Claude prompt submitted (claude tab: ${claudeTabId})`);
+            chrome.tabs.sendMessage(jdTabId, { type: 'SEER_CLAUDE_DONE' }).catch(() => {});
+            // Start alarm-based polling for response completion
+            startClaudeResponsePolling(claudeTabId, jdTabId, jobCompany, jobTitle);
           })
           .catch(err => {
             console.log(`[Seer BG] Claude submission failed: ${err.message}`);
-            chrome.tabs.sendMessage(tid, { type: 'SEER_CLAUDE_ERROR', message: err.message }).catch(() => {});
+            chrome.tabs.sendMessage(jdTabId, { type: 'SEER_CLAUDE_ERROR', message: err.message }).catch(() => {});
           });
       }
 
@@ -155,6 +172,7 @@ async function handleMessage(message: MessageType, senderTabId?: number): Promis
         analysis,
         promptTemplate: settings.prompts[analysis.recommended_base],
         selectedBase: analysis.recommended_base,
+        includeContext: settings.seerContext,
       });
 
       console.log(`[Seer BG] Prompt generated (${prompt.length} chars)`);
@@ -272,6 +290,170 @@ function cleanCrawlMarkdown(md: string): string {
     .replace(/\n{3,}/g, '\n\n')
     .trim();
 }
+
+// ─── Claude response detection ──────────────────────────────────────
+//
+// Primary: Hook Claude's own Notification API call. When Claude.ai fires
+// its "Claude responded" notification, our MAIN-world hook intercepts it
+// and relays to the background. This fires at the exact same moment as
+// Claude's standard notification — proven to work in background tabs
+// (Chrome defers DOM updates/rAF but NOT Notification constructor calls).
+//
+// Fallback: chrome.alarms hard timeout at 10min.
+
+const CLAUDE_POLL_ALARM = 'seer-claude-poll';
+
+interface ClaudePollState {
+  claudeTabId: number;
+  jdTabId: number;
+  startedAt: number;
+  jobCompany?: string;
+  jobTitle?: string;
+}
+
+async function startClaudeResponsePolling(claudeTabId: number, jdTabId: number, jobCompany?: string, jobTitle?: string) {
+  const state: ClaudePollState = { claudeTabId, jdTabId, startedAt: Date.now(), jobCompany, jobTitle };
+  await chrome.storage.session.set({ claudePollState: state });
+  // The Notification hook is injected via manifest content_scripts (MAIN world,
+  // document_start) so it's already in place before Claude's JS even loads.
+  // The ISOLATED world content script relays the event to us as SEER_CLAUDE_RESPONSE_READY.
+  // Hard-timeout alarm fallback in case the hook doesn't fire.
+  chrome.alarms.create(CLAUDE_POLL_ALARM, { delayInMinutes: 10 });
+  console.log(`[Seer BG] Monitoring Claude response (tab: ${claudeTabId}, jd: ${jdTabId})`);
+}
+
+// ── Listen for fetch-hook signal from Claude tab ──
+chrome.runtime.onMessage.addListener((msg: any, sender) => {
+  if (msg?.type !== 'SEER_CLAUDE_RESPONSE_READY') return;
+
+  chrome.storage.session.get('claudePollState').then(data => {
+    const state = data.claudePollState as ClaudePollState | undefined;
+    if (!state) return;
+    if (sender.tab?.id !== state.claudeTabId) return;
+
+    console.log(`[Seer BG] Claude response intercepted via fetch hook (${msg.responseText?.length || 0} chars)`);
+    onClaudeResponseComplete(state, msg.chatUrl, msg.responseText);
+  });
+});
+
+// Hard timeout fallback
+chrome.alarms.onAlarm.addListener(async (alarm) => {
+  if (alarm.name !== CLAUDE_POLL_ALARM) return;
+
+  const data = await chrome.storage.session.get('claudePollState');
+  const state = data.claudePollState as ClaudePollState | undefined;
+  if (!state) {
+    chrome.alarms.clear(CLAUDE_POLL_ALARM);
+    return;
+  }
+
+  console.log('[Seer BG] 10min hard timeout — assuming Claude finished');
+  await onClaudeResponseComplete(state);
+});
+
+async function onClaudeResponseComplete(state: ClaudePollState, hookChatUrl?: string, responseText?: string) {
+  chrome.alarms.clear(CLAUDE_POLL_ALARM);
+  await chrome.storage.session.remove('claudePollState');
+
+  let chatUrl = hookChatUrl || '';
+  if (!chatUrl) {
+    try {
+      const tab = await chrome.tabs.get(state.claudeTabId);
+      chatUrl = tab.url || '';
+    } catch { /* tab gone */ }
+  }
+
+  console.log(`[Seer BG] Claude done — chat URL: ${chatUrl}`);
+  if (responseText) {
+    console.log(`[Seer BG] Claude response (${responseText.length} chars): ${responseText.slice(0, 200)}...`);
+  }
+
+  // OS notification
+  const notifId = `seer-claude-${Date.now()}`;
+  chrome.notifications.create(notifId, {
+    type: 'basic',
+    iconUrl: chrome.runtime.getURL('icons/icon128.png'),
+    title: 'The Seer',
+    message: 'Claude has finished responding — click to review',
+  }, (createdId) => {
+    if (chrome.runtime.lastError) {
+      console.error(`[Seer BG] Notification failed: ${chrome.runtime.lastError.message}`);
+    } else {
+      console.log(`[Seer BG] Notification created: ${createdId}`);
+    }
+  });
+
+  // Persist notification data (survives worker restarts)
+  await chrome.storage.session.set({
+    [`seer_notif_${notifId}`]: { chatUrl, tabId: state.claudeTabId },
+  });
+
+  // Update JD tab panel with chat link + response text
+  chrome.tabs.sendMessage(state.jdTabId, {
+    type: 'SEER_CLAUDE_RESPONSE_COMPLETE',
+    chatUrl,
+    responseText,
+  }).catch(() => {});
+
+  // Trigger PDF generation via native messaging (non-blocking, silent on failure)
+  if (responseText) {
+    // Strip "@ Company" suffix from title if Grok appended it (e.g. "Applied AI Engineer @ Arc")
+    const cleanTitle = state.jobTitle?.replace(new RegExp(`\\s*@\\s*${state.jobCompany}\\s*$`, 'i'), '') || '';
+    const chatTitle = (state.jobCompany && cleanTitle) ? `${state.jobCompany} - ${cleanTitle}` : '';
+    console.log(`[Seer BG] PDF: chatTitle="${chatTitle}"`);
+    triggerPdfGeneration(responseText, chatTitle, state.jdTabId);
+  }
+}
+
+function triggerPdfGeneration(responseText: string, chatTitle: string, jdTabId: number) {
+  console.log(`[Seer BG] Triggering PDF generation (chatTitle: "${chatTitle}")`);
+
+  chrome.runtime.sendNativeMessage(
+    NATIVE_HOST,
+    { responseText, chatTitle: chatTitle || undefined },
+    (response) => {
+      if (chrome.runtime.lastError) {
+        console.log(`[Seer BG] Native messaging error: ${chrome.runtime.lastError.message}`);
+        chrome.tabs.sendMessage(jdTabId, {
+          type: 'SEER_PDF_ERROR',
+          error: chrome.runtime.lastError.message,
+        }).catch(() => {});
+        return;
+      }
+
+      if (response?.success) {
+        console.log(`[Seer BG] PDF generated: ${response.pdfPath}`);
+        chrome.tabs.sendMessage(jdTabId, {
+          type: 'SEER_PDF_READY',
+          pdfPath: response.pdfPath,
+          folderName: response.folderName,
+        }).catch(() => {});
+      } else {
+        console.log(`[Seer BG] PDF generation failed: ${response?.error || 'unknown'}`);
+        chrome.tabs.sendMessage(jdTabId, {
+          type: 'SEER_PDF_ERROR',
+          error: response?.error || 'Unknown error',
+        }).catch(() => {});
+      }
+    }
+  );
+}
+
+chrome.notifications.onClicked.addListener(async (notifId) => {
+  const key = `seer_notif_${notifId}`;
+  const data = await chrome.storage.session.get(key);
+  const info = data[key] as { chatUrl: string; tabId: number } | undefined;
+  if (info) {
+    chrome.tabs.update(info.tabId, { active: true }).catch(() => {});
+    chrome.tabs.get(info.tabId).then(tab => {
+      if (tab.windowId) {
+        chrome.windows.update(tab.windowId, { focused: true }).catch(() => {});
+      }
+    }).catch(() => {});
+    await chrome.storage.session.remove(key);
+  }
+  chrome.notifications.clear(notifId);
+});
 
 /** Strip scripts, styles, and noise from fetched HTML (runs in service worker, no DOM). */
 function cleanFetchedHtml(html: string): string {
