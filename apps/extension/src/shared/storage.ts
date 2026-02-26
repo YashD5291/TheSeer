@@ -11,7 +11,6 @@ export const DEFAULT_CLAUDE_MODEL = 'Sonnet 4.5';
 
 export async function getSettings(): Promise<SeerSettings> {
   const data: Record<string, any> = await chrome.storage.local.get([
-    'geminiApiKey',
     'profile',
     'baseResumeSummaries',
     'prompts',
@@ -22,7 +21,6 @@ export async function getSettings(): Promise<SeerSettings> {
     'dashboardUrl',
   ]);
   return {
-    geminiApiKey: (data.geminiApiKey as string) || '',
     profile: data.profile || null,
     baseResumeSummaries: data.baseResumeSummaries || DEFAULT_SUMMARIES,
     prompts: data.prompts || { gen_ai: '', mle: '', mix: '' },

@@ -48,9 +48,9 @@ export interface ExtractionResult {
   success: boolean;
   /** Structured job data if found via JSON-LD */
   jobData: JobData | null;
-  /** Raw page text for Gemini fallback */
+  /** Raw page text fallback */
   rawText: string;
-  /** JSON-LD data if found (passed to Gemini as higher-trust source) */
+  /** JSON-LD data if found */
   jsonLd: any | null;
   url: string;
   pageTitle: string;
@@ -63,7 +63,6 @@ export interface ExtractionResult {
 // Extension-specific types
 
 export interface SeerSettings {
-  geminiApiKey: string;
   profile: ParsedProfile | null;
   baseResumeSummaries: Record<BaseResumeSlug, string>;
   prompts: Record<BaseResumeSlug, string>;
@@ -78,7 +77,6 @@ export interface ScrapedJob {
   job: JobData;
   extraction: ExtractionResult | null;
   deepAnalysis: FitAnalysis | null;
-  geminiModel: string | null;
   claudePrompt: string | null;
   scrapedAt: string;
 }

@@ -341,17 +341,6 @@
     </div>
 
     <div class="card">
-      <h2>Gemini API Key</h2>
-      <div class="field">
-        <label for="api-key">API Key</label>
-        <input type="password" id="api-key" placeholder="Enter your Gemini API key">
-        <p class="hint">Get a free key at <a href="https://ai.google.dev/gemini-api" target="_blank">ai.google.dev</a></p>
-      </div>
-      <button class="btn btn-primary" id="save-key">Save API Key</button>
-      <div class="status" id="key-status"></div>
-    </div>
-
-    <div class="card">
       <h2>Profile Import</h2>
       <p style="font-size: 13px; color: #71717a; margin-bottom: 16px;">
         Import your profile from the CLI: run <code>pnpm seer export</code> to generate the JSON file.
@@ -374,6 +363,22 @@
       </div>
       <div class="actions" id="profile-actions" style="display: none;">
         <button class="btn btn-danger" id="clear-profile">Clear Profile</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>PDF Generator</h2>
+      <p style="font-size: 13px; color: #71717a; margin-bottom: 16px;">
+        The Seer generates tailored resume PDFs locally on your machine. Download and run the one-click installer for your platform.
+      </p>
+      <div id="pdf-gen-status" style="margin-bottom: 12px;"></div>
+      <div id="pdf-gen-download" style="display: flex; gap: 12px; flex-wrap: wrap;"></div>
+      <div style="margin-top: 16px;">
+        <div class="field">
+          <label for="ext-id-display">Your Extension ID</label>
+          <input type="text" id="ext-id-display" readonly style="background: #f4f4f5; cursor: default;">
+          <p class="hint">Pass this to the installer: <code>./install.sh &lt;extension-id&gt;</code></p>
+        </div>
       </div>
     </div>
 

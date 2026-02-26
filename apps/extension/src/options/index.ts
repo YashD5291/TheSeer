@@ -2,10 +2,6 @@ import { getSettings, saveSettings, getSystemPrompts, saveSystemPrompt, deleteSy
 import { PROMPT_REGISTRY, getDefaultPrompt } from '../shared/prompt-defaults.js';
 import type { ParsedProfile, BaseResumeSlug } from '../shared/types.js';
 
-const apiKeyInput = document.getElementById('api-key') as HTMLInputElement;
-const saveKeyBtn = document.getElementById('save-key')!;
-const keyStatus = document.getElementById('key-status')!;
-
 const fileDrop = document.getElementById('file-drop')!;
 const browseBtn = document.getElementById('browse-btn')!;
 const fileInput = document.getElementById('file-input') as HTMLInputElement;
@@ -20,26 +16,10 @@ const clearProfileBtn = document.getElementById('clear-profile')!;
 async function init() {
   const settings = await getSettings();
 
-  if (settings.geminiApiKey) {
-    apiKeyInput.value = settings.geminiApiKey;
-  }
-
   if (settings.profile) {
     renderCurrentProfile(settings.profile);
   }
 }
-
-// API Key save
-saveKeyBtn.addEventListener('click', async () => {
-  const key = apiKeyInput.value.trim();
-  if (!key) {
-    showStatus(keyStatus, 'Please enter an API key.', 'error');
-    return;
-  }
-
-  await saveSettings({ geminiApiKey: key });
-  showStatus(keyStatus, 'API key saved.', 'success');
-});
 
 // File import via drag & drop
 fileDrop.addEventListener('dragover', (e) => {
@@ -326,11 +306,90 @@ function escapeHtml(text: string): string {
   return div.innerHTML;
 }
 
+// ─── PDF Generator download section ───────────────────────────────────
+
+const GITHUB_REPO = 'theseer-app/theseer'; // Update this to your actual repo
+
+function initPdfGenerator() {
+  const downloadDiv = document.getElementById('pdf-gen-download')!;
+  const statusDiv = document.getElementById('pdf-gen-status')!;
+  const extIdInput = document.getElementById('ext-id-display') as HTMLInputElement;
+
+  // Show extension ID
+  extIdInput.value = chrome.runtime.id;
+
+  // Detect user's OS
+  const ua = navigator.userAgent.toLowerCase();
+  let detectedOs = 'unknown';
+  if (ua.includes('mac')) detectedOs = 'macos';
+  else if (ua.includes('win')) detectedOs = 'windows';
+
+  const assets = [
+    { os: 'macos', label: 'macOS (Apple Silicon)', file: 'theseer-pdf-macos-arm64.tar.gz' },
+    { os: 'macos', label: 'macOS (Intel)', file: 'theseer-pdf-macos-x64.tar.gz' },
+    { os: 'windows', label: 'Windows (x64)', file: 'theseer-pdf-windows-x64.zip' },
+  ];
+
+  // Fetch latest release URL
+  fetch(`https://api.github.com/repos/${GITHUB_REPO}/releases/latest`)
+    .then(r => r.ok ? r.json() : Promise.reject(new Error(`GitHub API: ${r.status}`)))
+    .then((release: any) => {
+      const tag = release.tag_name;
+      statusDiv.innerHTML = `<span style="font-size: 12px; color: #166534; background: #f0fdf4; padding: 4px 10px; border-radius: 4px; border: 1px solid #bbf7d0;">Latest: ${tag}</span>`;
+
+      for (const asset of assets) {
+        const ghAsset = release.assets?.find((a: any) => a.name === asset.file);
+        const url = ghAsset?.browser_download_url
+          || `https://github.com/${GITHUB_REPO}/releases/latest/download/${asset.file}`;
+        const isRecommended = asset.os === detectedOs;
+
+        const btn = document.createElement('a');
+        btn.href = url;
+        btn.className = 'btn btn-primary';
+        btn.target = '_blank';
+        btn.style.textDecoration = 'none';
+        btn.style.fontSize = '12px';
+        if (isRecommended) {
+          btn.style.background = '#166534';
+          btn.textContent = `${asset.label} (Recommended)`;
+        } else {
+          btn.style.background = '#52525b';
+          btn.textContent = asset.label;
+        }
+        downloadDiv.appendChild(btn);
+      }
+    })
+    .catch(() => {
+      // Fallback: direct links without version check
+      statusDiv.innerHTML = '<span style="font-size: 12px; color: #71717a;">Could not check for latest version.</span>';
+      for (const asset of assets) {
+        const url = `https://github.com/${GITHUB_REPO}/releases/latest/download/${asset.file}`;
+        const isRecommended = asset.os === detectedOs;
+
+        const btn = document.createElement('a');
+        btn.href = url;
+        btn.className = 'btn btn-primary';
+        btn.target = '_blank';
+        btn.style.textDecoration = 'none';
+        btn.style.fontSize = '12px';
+        if (isRecommended) {
+          btn.style.background = '#166534';
+          btn.textContent = `${asset.label} (Recommended)`;
+        } else {
+          btn.style.background = '#52525b';
+          btn.textContent = asset.label;
+        }
+        downloadDiv.appendChild(btn);
+      }
+    });
+}
+
 // ─── Init ─────────────────────────────────────────────────────────────
 
 async function initAll() {
   await init();
   await loadPrompts();
+  initPdfGenerator();
 }
 
 initAll();

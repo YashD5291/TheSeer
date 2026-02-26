@@ -184,7 +184,6 @@ async function handleMessage(message: MessageType, senderTabId?: number): Promis
         job: combined.job,
         extraction,
         deepAnalysis: combined.analysis,
-        geminiModel: combined.model,
         claudePrompt: claudePrompt || null,
         scrapedAt: new Date().toISOString(),
       };
