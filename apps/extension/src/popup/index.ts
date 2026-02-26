@@ -1,17 +1,41 @@
 import type { ScrapedJob, FitAnalysis } from '../shared/types.js';
-import { getEnabled, setEnabled } from '../shared/storage.js';
+import { getEnabled, setEnabled, getModelPrefs, saveModelPrefs } from '../shared/storage.js';
 
 const contentEl = document.getElementById('content')!;
 const optionsLink = document.getElementById('options-link')!;
 const toggle = document.getElementById('seer-toggle') as HTMLInputElement;
+const grokSelect = document.getElementById('grok-model') as HTMLSelectElement;
+const claudeSelect = document.getElementById('claude-model') as HTMLSelectElement;
+const thinkingToggle = document.getElementById('claude-thinking') as HTMLInputElement;
+const contextToggle = document.getElementById('seer-context') as HTMLInputElement;
 
 optionsLink.addEventListener('click', (e) => {
   e.preventDefault();
   chrome.runtime.openOptionsPage();
 });
 
+
 // ─── Toggle ──────────────────────────────────────────────────────────
 getEnabled().then(on => { toggle.checked = on; });
+
+// ─── Model preferences ──────────────────────────────────────────────
+getModelPrefs().then(prefs => {
+  grokSelect.value = prefs.grokModel;
+  claudeSelect.value = prefs.claudeModel;
+  thinkingToggle.checked = prefs.claudeExtendedThinking;
+  contextToggle.checked = prefs.seerContext;
+});
+
+const savePrefs = () => saveModelPrefs({
+  grokModel: grokSelect.value,
+  claudeModel: claudeSelect.value,
+  claudeExtendedThinking: thinkingToggle.checked,
+  seerContext: contextToggle.checked,
+});
+grokSelect.addEventListener('change', savePrefs);
+claudeSelect.addEventListener('change', savePrefs);
+thinkingToggle.addEventListener('change', savePrefs);
+contextToggle.addEventListener('change', savePrefs);
 
 toggle.addEventListener('change', async () => {
   const enabled = toggle.checked;

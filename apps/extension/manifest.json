@@ -8,7 +8,10 @@
     "storage",
     "clipboardWrite",
     "tabs",
-    "scripting"
+    "scripting",
+    "notifications",
+    "alarms",
+    "nativeMessaging"
   ],
   "host_permissions": [
     "<all_urls>"
@@ -24,6 +27,12 @@
       "css": ["dist/content.css"],
       "run_at": "document_end",
       "all_frames": false
+    },
+    {
+      "matches": ["*://claude.ai/*"],
+      "js": ["dist/claude-hook.js"],
+      "run_at": "document_start",
+      "world": "MAIN"
     }
   ],
   "action": {

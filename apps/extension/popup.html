@@ -254,6 +254,53 @@
 
     .footer a:hover { color: #3f3f46; text-decoration: underline; }
 
+    .model-bar {
+      padding: 10px 20px;
+      border-bottom: 1px solid #e4e4e7; background: #fafafa;
+    }
+    .model-row {
+      display: flex; gap: 10px; margin-bottom: 8px;
+    }
+    .toggle-row {
+      display: flex; gap: 16px;
+    }
+    .model-group { flex: 1; }
+    .model-label {
+      font-size: 10px; font-weight: 600; color: #71717a;
+      text-transform: uppercase; letter-spacing: 0.4px; margin-bottom: 3px;
+    }
+    .model-select {
+      width: 100%; padding: 5px 8px; border: 1px solid #d4d4d8;
+      border-radius: 5px; font-size: 12px; font-family: inherit;
+      background: #fff; color: #27272a; cursor: pointer;
+      outline: none;
+    }
+    .model-select:focus { border-color: #1a1a2e; }
+    .ext-toggle {
+      display: flex; align-items: center; gap: 6px;
+      white-space: nowrap;
+    }
+    .ext-toggle label {
+      font-size: 11px; font-weight: 600; color: #71717a;
+      text-transform: uppercase; letter-spacing: 0.3px; cursor: pointer;
+    }
+    .mini-toggle {
+      position: relative; display: inline-block;
+      width: 28px; height: 16px; cursor: pointer;
+    }
+    .mini-toggle input { position: absolute; opacity: 0; width: 0; height: 0; }
+    .mini-toggle-slider {
+      position: absolute; inset: 0; background: #d4d4d8;
+      border-radius: 8px; transition: background 0.2s;
+    }
+    .mini-toggle-slider::before {
+      content: ''; position: absolute; width: 12px; height: 12px;
+      left: 2px; top: 2px; background: white; border-radius: 50%;
+      transition: transform 0.2s;
+    }
+    .mini-toggle input:checked + .mini-toggle-slider { background: #1a1a2e; }
+    .mini-toggle input:checked + .mini-toggle-slider::before { transform: translateX(12px); }
+
     .loading {
       text-align: center;
       padding: 16px;
@@ -297,6 +344,45 @@
         <input type="checkbox" id="seer-toggle" checked>
         <span class="toggle-slider"></span>
       </label>
+    </div>
+  </div>
+
+  <div class="model-bar">
+    <div class="model-row">
+      <div class="model-group">
+        <div class="model-label">Grok Model</div>
+        <select class="model-select" id="grok-model">
+          <option value="Fast">Fast</option>
+          <option value="Expert">Expert</option>
+          <option value="Auto">Auto</option>
+        </select>
+      </div>
+      <div class="model-group">
+        <div class="model-label">Claude Model</div>
+        <select class="model-select" id="claude-model">
+          <option value="Sonnet 4.5">Sonnet 4.5</option>
+          <option value="Sonnet 4.6">Sonnet 4.6</option>
+          <option value="Haiku 4.5">Haiku 4.5</option>
+          <option value="Opus 4.5">Opus 4.5</option>
+          <option value="Opus 4.6">Opus 4.6</option>
+        </select>
+      </div>
+    </div>
+    <div class="toggle-row">
+      <div class="ext-toggle">
+        <span class="mini-toggle" title="Extended thinking">
+          <input type="checkbox" id="claude-thinking">
+          <span class="mini-toggle-slider"></span>
+        </span>
+        <label for="claude-thinking">Think</label>
+      </div>
+      <div class="ext-toggle">
+        <span class="mini-toggle" title="Append Seer analysis context to Claude prompt">
+          <input type="checkbox" id="seer-context">
+          <span class="mini-toggle-slider"></span>
+        </span>
+        <label for="seer-context">Context</label>
+      </div>
     </div>
   </div>
 
