@@ -78,13 +78,15 @@ function buildTarget(target: Target) {
 
   console.log(`  Archive: ${archiveDir}/`);
 
-  // Create tar.gz (macOS) or zip (Windows)
-  if (target.binaryName.endsWith('.exe')) {
-    execSync(`cd "${DIST}" && zip -r "${target.archiveName}.zip" "${target.archiveName}"`, { stdio: 'pipe' });
-    console.log(`  Package: ${join(DIST, target.archiveName + '.zip')}`);
-  } else {
-    execSync(`cd "${DIST}" && tar czf "${target.archiveName}.tar.gz" "${target.archiveName}"`, { stdio: 'pipe' });
-    console.log(`  Package: ${join(DIST, target.archiveName + '.tar.gz')}`);
+  // Create tar.gz (macOS) or zip (Windows) — skip with --no-archive (CI handles its own packaging)
+  if (!noArchive) {
+    if (target.binaryName.endsWith('.exe')) {
+      execSync(`cd "${DIST}" && zip -r "${target.archiveName}.zip" "${target.archiveName}"`, { stdio: 'pipe' });
+      console.log(`  Package: ${join(DIST, target.archiveName + '.zip')}`);
+    } else {
+      execSync(`cd "${DIST}" && tar czf "${target.archiveName}.tar.gz" "${target.archiveName}"`, { stdio: 'pipe' });
+      console.log(`  Package: ${join(DIST, target.archiveName + '.tar.gz')}`);
+    }
   }
 }
 
@@ -163,6 +165,7 @@ pause
 
 // Parse args
 const buildArgs = process.argv.slice(2);
+const noArchive = buildArgs.includes('--no-archive');
 const buildAll = buildArgs.includes('--all');
 const targetArg = buildArgs.find(a => a !== '--all' && !a.startsWith('--'));
 const targetFlag = buildArgs[buildArgs.indexOf('--target') + 1];
