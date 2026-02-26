@@ -1,0 +1,100 @@
+name: Release PDF Generator
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+env:
+  TECTONIC_VERSION: "0.15.0"
+
+jobs:
+  build:
+    strategy:
+      matrix:
+        include:
+          - os: macos-14
+            target: darwin-arm64
+            artifact: theseer-pdf-macos-arm64
+            archive: tar.gz
+            tectonic_asset: tectonic-0.15.0-aarch64-apple-darwin.tar.gz
+            tectonic_binary: tectonic
+          - os: macos-13
+            target: darwin-x64
+            artifact: theseer-pdf-macos-x64
+            archive: tar.gz
+            tectonic_asset: tectonic-0.15.0-x86_64-apple-darwin.tar.gz
+            tectonic_binary: tectonic
+          - os: windows-latest
+            target: win-x64
+            artifact: theseer-pdf-windows-x64
+            archive: zip
+            tectonic_asset: tectonic-0.15.0-x86_64-pc-windows-msvc.zip
+            tectonic_binary: tectonic.exe
+
+    runs-on: ${{ matrix.os }}
+    name: Build (${{ matrix.target }})
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Download tectonic
+        shell: bash
+        run: |
+          mkdir -p /tmp/tectonic-dl
+          cd /tmp/tectonic-dl
+          curl -fsSL -o tectonic-archive "https://github.com/tectonic-typesetting/tectonic/releases/download/tectonic%40${{ env.TECTONIC_VERSION }}/${{ matrix.tectonic_asset }}"
+          if [[ "${{ matrix.tectonic_asset }}" == *.zip ]]; then
+            unzip -o tectonic-archive
+          else
+            tar xzf tectonic-archive
+          fi
+          ls -la
+
+      - name: Build binary and package
+        working-directory: apps/resume-gen
+        shell: bash
+        run: |
+          bun run build.ts --target ${{ matrix.target }}
+          # Copy tectonic into the archive
+          cp /tmp/tectonic-dl/${{ matrix.tectonic_binary }} dist/${{ matrix.artifact }}/${{ matrix.tectonic_binary }}
+          # Re-package with tectonic included
+          cd dist
+          if [[ "${{ matrix.archive }}" == "zip" ]]; then
+            rm -f "${{ matrix.artifact }}.zip"
+            powershell -Command "Compress-Archive -Path '${{ matrix.artifact }}' -DestinationPath '${{ matrix.artifact }}.zip' -Force" 2>/dev/null || zip -r "${{ matrix.artifact }}.zip" "${{ matrix.artifact }}"
+          else
+            rm -f "${{ matrix.artifact }}.tar.gz"
+            tar czf "${{ matrix.artifact }}.tar.gz" "${{ matrix.artifact }}"
+          fi
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact }}
+          path: apps/resume-gen/dist/${{ matrix.artifact }}.${{ matrix.archive }}
+
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+    name: Create Release
+
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          generate_release_notes: true
+          files: |
+            artifacts/**/*.tar.gz
+            artifacts/**/*.zip
