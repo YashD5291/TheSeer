@@ -41,11 +41,31 @@ const BASE_DIR = getBaseDir();
 // Detect dev mode: running from source with GEN/ directory present
 const IS_DEV = existsSync(join(BASE_DIR, 'GEN', 'GEN-V3.tex'));
 
+// User config (stored at ~/.theseer/config.json)
+const CONFIG_PATH = join(
+  platform() === 'win32'
+    ? join(process.env.LOCALAPPDATA || join(homedir(), 'AppData', 'Local'), 'TheSeer')
+    : join(homedir(), '.theseer'),
+  'config.json'
+);
+
+function loadConfig(): Record<string, string> {
+  try { return existsSync(CONFIG_PATH) ? JSON.parse(readFileSync(CONFIG_PATH, 'utf-8')) : {}; } catch { return {}; }
+}
+
+function saveConfig(config: Record<string, string>) {
+  mkdirSync(dirname(CONFIG_PATH), { recursive: true });
+  writeFileSync(CONFIG_PATH, JSON.stringify(config, null, 2), 'utf-8');
+}
+
+const userConfig = loadConfig();
+
 // Template and output resolve differently for dev vs installed
 const TEMPLATE_PATH = process.env.THESEER_TEMPLATE
   || (IS_DEV ? join(BASE_DIR, 'GEN', 'GEN-V3.tex') : join(BASE_DIR, 'templates', 'default.tex'));
 const OUTPUT_BASE = process.env.THESEER_OUTPUT
-  || (IS_DEV ? join(BASE_DIR, 'Experimental') : join(BASE_DIR, 'output'));
+  || userConfig.outputDir
+  || (IS_DEV ? join(BASE_DIR, 'Experimental') : '');
 const TECTONIC_PATH = process.env.THESEER_TECTONIC
   || (existsSync(join(BASE_DIR, 'bin', 'tectonic')) ? join(BASE_DIR, 'bin', 'tectonic') : join(BASE_DIR, 'tectonic'));
 const ALT_PDF_NAME = 'resume.pdf';
@@ -59,6 +79,26 @@ const args = process.argv.slice(2);
 
 if (args.includes('--setup')) {
   await runSetup();
+} else if (args.includes('--help') || args.includes('-h')) {
+  printUsage();
+  process.exit(0);
+} else if (args.includes('--set-output')) {
+  const dir = args[args.indexOf('--set-output') + 1];
+  if (!dir || dir.startsWith('--')) {
+    console.log(`${TAG} Current output directory: ${OUTPUT_BASE}`);
+    console.log(`${TAG} Usage: theseer-pdf --set-output /path/to/folder`);
+  } else {
+    const resolved = resolve(dir);
+    mkdirSync(resolved, { recursive: true });
+    const config = loadConfig();
+    config.outputDir = resolved;
+    saveConfig(config);
+    console.log(`${TAG} Output directory set to: ${resolved}`);
+  }
+} else if (!OUTPUT_BASE) {
+  console.error(`${TAG} No output directory configured.`);
+  console.error(`${TAG} Set one with: theseer-pdf --set-output /path/to/folder`);
+  process.exit(1);
 } else if (args.includes('--native-host')) {
   await runNativeHost();
 } else {
@@ -164,12 +204,16 @@ Usage:
   theseer-pdf <input.md> --json                 # Machine-readable JSON output
   theseer-pdf --native-host                     # Chrome native messaging mode
   theseer-pdf --setup [extension-id]            # Install native messaging host
+  theseer-pdf --setup <ext-id> --output-dir ~/Resumes  # Install + set output dir
+  theseer-pdf --set-output ~/Resumes            # Change output directory
 
 Options:
   --name <name>       Override folder name
   --json              Output JSON to stdout
   --native-host       Run as Chrome native messaging host
   --setup [ext-id]    Register with Chrome
+  --output-dir <path> Set output directory during setup
+  --set-output <path> Change output directory anytime
   --help, -h          Show this help
 `);
 }
@@ -309,8 +353,17 @@ function runResumeGenSubprocess(tempFile: string, chatTitle: string | null): Pro
 // ============================================================
 
 async function runSetup() {
-  const extensionId = args.find(a => a !== '--setup' && !a.startsWith('--')) || '';
+  const extensionId = args.find(a => a !== '--setup' && a !== args[args.indexOf('--output-dir') + 1] && !a.startsWith('--')) || '';
+  const outputDirIdx = args.indexOf('--output-dir');
+  const outputDirArg = outputDirIdx !== -1 ? args[outputDirIdx + 1] : null;
   const os = platform();
+
+  // Output directory is mandatory — must be provided via --output-dir or already configured
+  if (!outputDirArg && !userConfig.outputDir) {
+    console.error(`${TAG} Output directory is required.`);
+    console.error(`${TAG} Usage: theseer-pdf --setup <extension-id> --output-dir /path/to/folder`);
+    process.exit(1);
+  }
 
   console.log(`${TAG} Setting up The Seer PDF Generator...`);
   console.log(`${TAG} Platform: ${os}`);
@@ -422,6 +475,18 @@ async function runSetup() {
 
     console.log(`${TAG} Shell wrapper: ${wrapperPath}`);
     console.log(`${TAG} Manifest: ${manifestPath}`);
+  }
+
+  // Save output directory preference
+  if (outputDirArg) {
+    const resolved = resolve(outputDirArg);
+    mkdirSync(resolved, { recursive: true });
+    const config = loadConfig();
+    config.outputDir = resolved;
+    saveConfig(config);
+    console.log(`${TAG} Output directory: ${resolved}`);
+  } else {
+    console.log(`${TAG} Output directory: ${outputDir} (change with: theseer-pdf --set-output /your/path)`);
   }
 
   console.log('');
