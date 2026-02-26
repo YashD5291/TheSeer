@@ -8,15 +8,21 @@ const CLAUDE_PROJECT_URL = 'https://claude.ai/project/019af037-9894-7058-8e80-37
 
 /**
  * Open a new Claude chat in the project, paste the prompt, and submit it.
- * Resolves when the prompt has been submitted (does NOT wait for Claude's response).
+ * Resolves with the Claude tab ID when the prompt has been submitted.
  */
-export async function submitPromptToClaude(prompt: string): Promise<void> {
+export async function submitPromptToClaude(
+  prompt: string,
+  preferredModel?: string,
+  extendedThinking?: boolean,
+): Promise<number> {
   console.log(`[Seer Claude] Opening Claude project chat...`);
   const tab = await chrome.tabs.create({ url: CLAUDE_PROJECT_URL, active: false });
   const tabId = tab.id!;
   await waitForTabLoad(tabId);
   console.log(`[Seer Claude] Tab loaded (${tabId}), injecting automation...`);
 
+  const modelToUse = preferredModel || 'Sonnet 4.5';
+  const wantThinking = extendedThinking === true;
   const requestId = crypto.randomUUID();
 
   const resultPromise = new Promise<void>((resolve, reject) => {
@@ -39,12 +45,13 @@ export async function submitPromptToClaude(prompt: string): Promise<void> {
   await chrome.scripting.executeScript({
     target: { tabId },
     func: claudeAutomation,
-    args: [prompt, requestId],
+    args: [prompt, requestId, modelToUse, wantThinking],
   });
-  console.log(`[Seer Claude] Automation injected (requestId: ${requestId}), waiting for submit...`);
+  console.log(`[Seer Claude] Automation injected (requestId: ${requestId}, model: ${modelToUse}, thinking: ${wantThinking}), waiting for submit...`);
 
   await resultPromise;
-  console.log(`[Seer Claude] Prompt submitted successfully`);
+  console.log(`[Seer Claude] Prompt submitted successfully (tab: ${tabId})`);
+  return tabId;
 }
 
 // ─── Tab management ───────────────────────────────────────────────────
@@ -67,7 +74,7 @@ function waitForTabLoad(tabId: number): Promise<void> {
  * Runs INSIDE the claude.ai tab via chrome.scripting.executeScript.
  * Must be entirely self-contained — no imports, no external references.
  */
-function claudeAutomation(prompt: string, requestId: string): void {
+function claudeAutomation(prompt: string, requestId: string, preferredModel: string, wantThinking: boolean): void {
   const sleep = (ms: number) => new Promise<void>(r => setTimeout(r, ms));
 
   const sendSuccess = () => {
@@ -90,8 +97,108 @@ function claudeAutomation(prompt: string, requestId: string): void {
       if (!input) { sendError('Chat input not found after 10s'); return; }
       await sleep(500); // Let ProseMirror fully initialize
 
-      // ── Step 2: Paste prompt ──
-      console.log('[Seer Claude] Step 2: Pasting prompt...');
+      // ── Step 2: Select Sonnet 4.5 and disable extended thinking ──
+      console.log('[Seer Claude] Step 2: Configuring model...');
+      const modelBtn = document.querySelector('button[data-testid="model-selector-dropdown"]') as HTMLButtonElement;
+      if (modelBtn) {
+        const btnText = modelBtn.textContent || '';
+        const isPreferred = btnText.includes(preferredModel);
+        const hasExtended = btnText.includes('Extended');
+        const needsThinkingToggle = hasExtended !== wantThinking;
+
+        if (!isPreferred || needsThinkingToggle) {
+          // Open model menu
+          modelBtn.click();
+          await sleep(500);
+
+          // Toggle extended thinking if it doesn't match preference
+          if (needsThinkingToggle) {
+            const allItems = document.querySelectorAll('[role="menuitem"]');
+            for (const item of allItems) {
+              if (item.textContent?.includes('Extended thinking')) {
+                const toggle = item.querySelector('input[role="switch"]') as HTMLInputElement;
+                if (toggle && toggle.checked !== wantThinking) {
+                  console.log(`[Seer Claude] ${wantThinking ? 'Enabling' : 'Disabling'} extended thinking...`);
+                  (item as HTMLElement).click();
+                  await sleep(400);
+                }
+                break;
+              }
+            }
+          }
+
+          // Select preferred model if needed
+          if (!isPreferred) {
+            // First check if preferred model is in the main menu
+            let found = false;
+            const mainItems = document.querySelectorAll('[role="menuitem"]');
+            for (const item of mainItems) {
+              const label = item.querySelector('.font-ui');
+              if (label?.textContent?.trim() === preferredModel) {
+                console.log(`[Seer Claude] Found ${preferredModel} in main menu, clicking...`);
+                (item as HTMLElement).click();
+                found = true;
+                break;
+              }
+            }
+
+            // If not in main menu, expand "More models" submenu
+            if (!found) {
+              let moreBtn: HTMLElement | null = null;
+              const items2 = document.querySelectorAll('[role="menuitem"]');
+              for (const item of items2) {
+                if (item.textContent?.includes('More models')) {
+                  moreBtn = item as HTMLElement;
+                  break;
+                }
+              }
+
+              if (moreBtn) {
+                console.log('[Seer Claude] Opening "More models" submenu...');
+                // Hover to expand the submenu
+                moreBtn.dispatchEvent(new PointerEvent('pointerenter', { bubbles: true }));
+                moreBtn.dispatchEvent(new MouseEvent('mouseenter', { bubbles: true }));
+                await sleep(600);
+
+                // Click if submenu didn't open via hover
+                if (moreBtn.getAttribute('aria-expanded') !== 'true') {
+                  moreBtn.click();
+                  await sleep(500);
+                }
+
+                // Find preferred model in submenu
+                const subItems = document.querySelectorAll('[role="menuitem"]');
+                for (const item of subItems) {
+                  const label = item.querySelector('.font-ui');
+                  if (label?.textContent?.trim() === preferredModel) {
+                    console.log(`[Seer Claude] Found ${preferredModel} in submenu, clicking...`);
+                    (item as HTMLElement).click();
+                    found = true;
+                    break;
+                  }
+                }
+              }
+            }
+
+            if (!found) {
+              console.log(`[Seer Claude] ${preferredModel} not found in menu — closing`);
+              document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+            }
+          } else {
+            // Model was already correct, just needed to toggle thinking — close menu
+            document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+          }
+
+          await sleep(500); // Let model switch settle
+        } else {
+          console.log(`[Seer Claude] Already on ${preferredModel} (thinking: ${wantThinking ? 'on' : 'off'}) — no changes needed`);
+        }
+      } else {
+        console.log('[Seer Claude] Model selector not found — skipping');
+      }
+
+      // ── Step 3: Paste prompt ──
+      console.log('[Seer Claude] Step 3: Pasting prompt...');
       input.focus();
       await sleep(100);
 
@@ -117,8 +224,8 @@ function claudeAutomation(prompt: string, requestId: string): void {
         await sleep(500);
       }
 
-      // ── Step 3: Find and click send button ──
-      console.log('[Seer Claude] Step 3: Looking for send button...');
+      // ── Step 4: Find and click send button ──
+      console.log('[Seer Claude] Step 4: Looking for send button...');
       await sleep(500); // Let UI react to pasted content
 
       const SEND_SELECTORS = [

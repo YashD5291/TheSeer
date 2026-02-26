@@ -6,11 +6,11 @@
 
 import type { JobData, ParsedProfile, FitAnalysis, BaseResumeSlug } from './types.js';
 import { getDefaultPrompt, interpolateTemplate } from './prompt-defaults.js';
-import { getSystemPrompts } from './storage.js';
+import { getSystemPrompts, getModelPrefs } from './storage.js';
 
 export interface GrokResponse {
   text: string;
-  model: 'grok-chat';
+  model: string;
 }
 
 // Track Grok tabs currently in use by active analyses
@@ -26,6 +26,7 @@ export async function callGrok(prompt: string): Promise<GrokResponse> {
   inUseGrokTabs.add(tabId);
   console.log(`[Seer Grok] Tab ready (${tabId}), executing automation (${prompt.length} chars)...`);
 
+  const { grokModel } = await getModelPrefs();
   const requestId = crypto.randomUUID();
   const t0 = Date.now();
 
@@ -52,15 +53,15 @@ export async function callGrok(prompt: string): Promise<GrokResponse> {
     await chrome.scripting.executeScript({
       target: { tabId },
       func: grokAutomation,
-      args: [prompt, requestId],
+      args: [prompt, requestId, grokModel],
     });
-    console.log(`[Seer Grok] Automation injected (requestId: ${requestId}), waiting for result...`);
+    console.log(`[Seer Grok] Automation injected (requestId: ${requestId}, model: ${grokModel}), waiting for result...`);
 
     const text = await resultPromise;
 
     const elapsed = ((Date.now() - t0) / 1000).toFixed(1);
     console.log(`[Seer Grok] Response in ${elapsed}s (${text.length} chars)`);
-    return { text, model: 'grok-chat' };
+    return { text, model: `grok-${grokModel.toLowerCase()}` };
   } finally {
     inUseGrokTabs.delete(tabId);
     chrome.tabs.remove(tabId).catch(() => {});
@@ -117,7 +118,7 @@ function waitForTabLoad(tabId: number): Promise<void> {
  * It must be entirely self-contained — no imports, no external references.
  * Sends the result back via chrome.runtime.sendMessage (fire-and-forget pattern).
  */
-function grokAutomation(prompt: string, requestId: string): void {
+function grokAutomation(prompt: string, requestId: string, preferredModel: string): void {
   const SELECTORS = {
     chatInput: '.query-bar div.tiptap.ProseMirror[contenteditable="true"]',
     chatInputFallback: 'div.ProseMirror[contenteditable="true"]',
@@ -168,8 +169,8 @@ function grokAutomation(prompt: string, requestId: string): void {
       const modelBtn = document.querySelector('#model-select-trigger') as HTMLButtonElement | null;
       if (modelBtn) {
         const modelLabel = modelBtn.querySelector('span.font-semibold')?.textContent?.trim() || '';
-        console.log(`[Seer Grok] Step 1.5: Current model: "${modelLabel}"`);
-        if (modelLabel.toLowerCase() !== 'fast') {
+        console.log(`[Seer Grok] Step 1.5: Current model: "${modelLabel}", preferred: "${preferredModel}"`);
+        if (modelLabel.toLowerCase() !== preferredModel.toLowerCase()) {
           // Open the model dropdown via pointer events (Radix UI)
           simulateClick(modelBtn);
           await sleep(800);
@@ -191,15 +192,15 @@ function grokAutomation(prompt: string, requestId: string): void {
             for (const item of menuItems) {
               const label = item.querySelector('span.font-semibold')?.textContent?.trim() || '';
               console.log(`[Seer Grok] Step 1.5: Menu item: "${label}"`);
-              if (label.toLowerCase() === 'fast') {
+              if (label.toLowerCase() === preferredModel.toLowerCase()) {
                 simulateClick(item as HTMLElement);
                 clicked = true;
-                console.log('[Seer Grok] Step 1.5: Selected "Fast" model');
+                console.log(`[Seer Grok] Step 1.5: Selected "${preferredModel}" model`);
                 break;
               }
             }
             if (!clicked) {
-              console.warn('[Seer Grok] Step 1.5: "Fast" option not found in dropdown items');
+              console.warn(`[Seer Grok] Step 1.5: "${preferredModel}" option not found in dropdown items`);
               document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
             }
           } else {
@@ -207,7 +208,7 @@ function grokAutomation(prompt: string, requestId: string): void {
           }
           await sleep(800); // Let model switch settle
         } else {
-          console.log('[Seer Grok] Step 1.5: Already on Fast model');
+          console.log(`[Seer Grok] Step 1.5: Already on ${preferredModel} model`);
         }
       } else {
         console.warn('[Seer Grok] Step 1.5: Model selector button not found — proceeding');
