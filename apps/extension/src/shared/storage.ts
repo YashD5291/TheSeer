@@ -28,7 +28,7 @@ export async function getSettings(): Promise<SeerSettings> {
     claudeModel: (data.claudeModel as string) || DEFAULT_CLAUDE_MODEL,
     claudeExtendedThinking: data.claudeExtendedThinking === true, // default off
     seerContext: data.seerContext === true, // default off
-    dashboardUrl: (data.dashboardUrl as string) || 'http://localhost:3000',
+    dashboardUrl: (data.dashboardUrl as string) || 'https://the-seer-dashboard.vercel.app',
   };
 }
 
