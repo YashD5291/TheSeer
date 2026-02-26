@@ -2,6 +2,7 @@ import { getSettings, saveJobForTab, getJobForTab, removeJobForTab, getEnabled }
 import { extractAndAnalyzeViaGrok } from '../shared/grok-client.js';
 import { buildClaudePrompt } from '../shared/prompt-builder.js';
 import { submitPromptToClaude } from '../shared/claude-client.js';
+import { trackJobCreated, trackClaudeData, trackResumeGenerated } from '../shared/tracker.js';
 import type { ScrapedJob, MessageType } from '../shared/types.js';
 
 const NATIVE_HOST = 'com.theseer.resumegen';
@@ -43,6 +44,7 @@ async function handleMessage(message: MessageType, senderTabId?: number): Promis
   switch (message.type) {
     // ─── New: Content script sends extraction result ──────────────
     case 'PAGE_EXTRACTED': {
+      const t_start = performance.now();
       const enabled = await getEnabled();
       if (!enabled) {
         return { type: 'ERROR', message: 'Seer is disabled.' };
@@ -60,6 +62,8 @@ async function handleMessage(message: MessageType, senderTabId?: number): Promis
       // ── Gather best content, send to Grok for full analysis ──
       console.log(`[Seer BG] Gathering content for Grok analysis`);
       let rawText = extraction.rawText;
+
+      const t_crawl_start = performance.now();
 
       // Try Crawl4AI first
       let crawlMarkdown = await tryCrawlServer(extraction.url, extraction.iframeUrls);
@@ -87,9 +91,11 @@ async function handleMessage(message: MessageType, senderTabId?: number): Promis
         }
       }
 
+      const t_crawl_end = performance.now();
+
       console.log(`[Seer BG] Best content: ${rawText.length} chars — sending to Grok`);
 
-      const t0 = Date.now();
+      const t_grok_start = performance.now();
       const combined = await extractAndAnalyzeViaGrok({
         rawText,
         jsonLd: extraction.jsonLd,
@@ -98,7 +104,8 @@ async function handleMessage(message: MessageType, senderTabId?: number): Promis
         url: extraction.url,
         pageTitle: extraction.pageTitle,
       });
-      console.log(`[Seer BG] Grok responded in ${((Date.now() - t0) / 1000).toFixed(1)}s`);
+      const t_grok_end = performance.now();
+      console.log(`[Seer BG] Grok responded in ${((t_grok_end - t_grok_start) / 1000).toFixed(1)}s`);
       console.log(`[Seer BG] Extracted: "${combined.job.title}" @ ${combined.job.company}`);
       console.log(`[Seer BG] Fit: ${combined.analysis.fit_score}/100, base: ${combined.analysis.recommended_base}, rec: ${combined.analysis.apply_recommendation}`);
 
@@ -117,6 +124,61 @@ async function handleMessage(message: MessageType, senderTabId?: number): Promis
       } else {
         console.log(`[Seer BG] No prompt template for "${combined.analysis.recommended_base}" — skipping auto-prompt`);
       }
+
+      // ── Track job in dashboard (fire-and-forget) ──
+      const crawlMs = Math.round(t_crawl_end - t_crawl_start);
+      const grokMs = Math.round(t_grok_end - t_grok_start);
+      const extractionMs = Math.round(performance.now() - t_start);
+      trackJobCreated({
+        title: combined.job.title,
+        company: combined.job.company,
+        url: combined.job.url || extraction.url,
+        location: combined.job.location,
+        salaryRange: combined.job.salary_range,
+        jobType: combined.job.job_type,
+        description: combined.job.description,
+        requirements: combined.job.requirements,
+        niceToHaves: combined.job.nice_to_haves,
+        platform: combined.job.platform,
+        extraction: {
+          method: extraction.extractionMethod,
+          rawTextLength: extraction.rawText.length,
+          iframeUrls: extraction.iframeUrls || [],
+          hadJsonLd: !!extraction.jsonLd,
+        },
+        analysis: {
+          fitScore: combined.analysis.fit_score,
+          confidence: combined.analysis.confidence,
+          recommendedBase: combined.analysis.recommended_base,
+          baseReasoning: combined.analysis.base_reasoning,
+          keyMatches: combined.analysis.key_matches,
+          gaps: combined.analysis.gaps,
+          gapMitigation: combined.analysis.gap_mitigation,
+          tailoringPriorities: combined.analysis.tailoring_priorities,
+          atsKeywords: combined.analysis.ats_keywords,
+          redFlags: combined.analysis.red_flags,
+          estimatedCompetition: combined.analysis.estimated_competition,
+          applyRecommendation: combined.analysis.apply_recommendation,
+        },
+        models: {
+          grok: settings.grokModel,
+          claude: settings.claudeModel,
+          claudeExtendedThinking: settings.claudeExtendedThinking,
+        },
+        timing: {
+          extractionMs,
+          crawlMs,
+          grokMs,
+        },
+        claudePrompt: claudePrompt || undefined,
+        status: 'analyzed',
+      }).then((dashboardJobId) => {
+        if (dashboardJobId && senderTabId != null) {
+          // Store dashboard _id keyed by tab for later Claude/PDF tracking
+          chrome.storage.session.set({ [`seer_dashboard_job_${senderTabId}`]: dashboardJobId }).catch(() => {});
+          console.log(`[Seer Tracker] Stored dashboard job ${dashboardJobId} for tab ${senderTabId}`);
+        }
+      }).catch(() => {});
 
       const scrapedJob: ScrapedJob = {
         job: combined.job,
@@ -368,6 +430,19 @@ async function onClaudeResponseComplete(state: ClaudePollState, hookChatUrl?: st
     console.log(`[Seer BG] Claude response (${responseText.length} chars): ${responseText.slice(0, 200)}...`);
   }
 
+  // ── Track Claude data in dashboard (fire-and-forget) ──
+  const claudeResponseMs = Date.now() - state.startedAt;
+  chrome.storage.session.get(`seer_dashboard_job_${state.jdTabId}`).then(data => {
+    const dashboardJobId = data[`seer_dashboard_job_${state.jdTabId}`] as string | undefined;
+    if (dashboardJobId) {
+      trackClaudeData(dashboardJobId, {
+        claudeResponse: responseText,
+        claudeChatUrl: chatUrl,
+        claudeResponseMs,
+      }).catch(() => {});
+    }
+  }).catch(() => {});
+
   // OS notification
   const notifId = `seer-claude-${Date.now()}`;
   chrome.notifications.create(notifId, {
@@ -407,6 +482,7 @@ async function onClaudeResponseComplete(state: ClaudePollState, hookChatUrl?: st
 
 function triggerPdfGeneration(responseText: string, chatTitle: string, jdTabId: number) {
   console.log(`[Seer BG] Triggering PDF generation (chatTitle: "${chatTitle}")`);
+  const pdfStartedAt = Date.now();
 
   chrome.runtime.sendNativeMessage(
     NATIVE_HOST,
@@ -427,6 +503,21 @@ function triggerPdfGeneration(responseText: string, chatTitle: string, jdTabId: 
           type: 'SEER_PDF_READY',
           pdfPath: response.pdfPath,
           folderName: response.folderName,
+        }).catch(() => {});
+
+        // ── Track resume in dashboard (fire-and-forget) ──
+        const pdfMs = Date.now() - pdfStartedAt;
+        chrome.storage.session.get(`seer_dashboard_job_${jdTabId}`).then(data => {
+          const dashboardJobId = data[`seer_dashboard_job_${jdTabId}`] as string | undefined;
+          if (dashboardJobId) {
+            trackResumeGenerated(dashboardJobId, {
+              latexSource: response.latexSource,
+              pdfBase64: response.pdfBase64,
+              pdfSizeBytes: response.pdfSizeBytes,
+              folderName: response.folderName,
+              pdfMs,
+            }).catch(() => {});
+          }
         }).catch(() => {});
       } else {
         console.log(`[Seer BG] PDF generation failed: ${response?.error || 'unknown'}`);
