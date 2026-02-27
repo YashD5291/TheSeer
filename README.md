@@ -300,7 +300,7 @@ git tag v1.0.0
 git push origin v1.0.0
 ```
 
-This builds standalone binaries for macOS (ARM + Intel) and Windows (x64), bundles tectonic, and publishes to GitHub Releases.
+This builds standalone binaries for macOS (ARM + Intel), Linux (x64 + ARM64), and Windows (x64), bundles tectonic, and publishes to GitHub Releases.
 
 ---
 
