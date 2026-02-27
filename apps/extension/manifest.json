@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
-  "name": "The Seer - AI Resume Fit Checker",
+  "name": "The Seer - AI Resume Tailor",
   "version": "0.2.0",
-  "description": "Instantly analyze job posting fit against your profile.",
+  "description": "Analyze job postings and generate tailored resume PDFs in one click.",
   "permissions": [
     "activeTab",
     "storage",
