@@ -125,15 +125,6 @@ After setup, restart Chrome, import your profile (extension icon → Settings), 
 ~/.theseer/bin/theseer-pdf --set-output ~/Desktop/Resumes
 ```
 
-### Dashboard (Optional)
-
-The extension tracks every application to a hosted dashboard. To use your own:
-
-1. Fork [TheSeer-Dashboard](https://github.com/YashD5291/TheSeer-Dashboard)
-2. Deploy to Vercel
-3. Add `MONGODB_URI` env var in Vercel (free MongoDB Atlas cluster)
-4. Update `dashboardUrl` in extension storage or modify the default in `src/shared/storage.ts`
-
 <details>
 <summary><strong>Manual Setup</strong> (if you prefer step-by-step)</summary>
 
