@@ -28,6 +28,18 @@ jobs:
             archive: tar.gz
             tectonic_asset: tectonic-0.15.0-x86_64-apple-darwin.tar.gz
             tectonic_binary: tectonic
+          - os: ubuntu-latest
+            target: linux-x64
+            artifact: theseer-pdf-linux-x64
+            archive: tar.gz
+            tectonic_asset: tectonic-0.15.0-x86_64-unknown-linux-gnu.tar.gz
+            tectonic_binary: tectonic
+          - os: ubuntu-latest
+            target: linux-arm64
+            artifact: theseer-pdf-linux-arm64
+            archive: tar.gz
+            tectonic_asset: tectonic-0.15.0-aarch64-unknown-linux-gnu.tar.gz
+            tectonic_binary: tectonic
           - os: windows-latest
             target: win-x64
             artifact: theseer-pdf-windows-x64

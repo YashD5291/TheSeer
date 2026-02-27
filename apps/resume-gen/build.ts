@@ -6,6 +6,8 @@
  *   bun run build.ts                          # Build for current platform
  *   bun run build.ts --target darwin-arm64     # Cross-compile for macOS ARM
  *   bun run build.ts --target darwin-x64       # Cross-compile for macOS Intel
+ *   bun run build.ts --target linux-x64        # Cross-compile for Linux x64
+ *   bun run build.ts --target linux-arm64      # Cross-compile for Linux ARM
  *   bun run build.ts --target win-x64          # Cross-compile for Windows
  *   bun run build.ts --all                     # Build all platforms
  */
@@ -39,6 +41,20 @@ const TARGETS: Record<string, Target> = {
     bunTarget: 'bun-darwin-x64',
     binaryName: 'theseer-pdf',
     archiveName: 'theseer-pdf-macos-x64',
+    installerName: 'install.sh',
+  },
+  'linux-x64': {
+    name: 'Linux (x64)',
+    bunTarget: 'bun-linux-x64',
+    binaryName: 'theseer-pdf',
+    archiveName: 'theseer-pdf-linux-x64',
+    installerName: 'install.sh',
+  },
+  'linux-arm64': {
+    name: 'Linux (ARM64)',
+    bunTarget: 'bun-linux-arm64',
+    binaryName: 'theseer-pdf',
+    archiveName: 'theseer-pdf-linux-arm64',
     installerName: 'install.sh',
   },
   'win-x64': {
@@ -183,7 +199,7 @@ if (buildAll) {
 } else {
   // Default: build for current platform
   const arch = process.arch === 'arm64' ? 'arm64' : 'x64';
-  const os = process.platform === 'win32' ? 'win' : 'darwin';
+  const os = process.platform === 'win32' ? 'win' : process.platform === 'linux' ? 'linux' : 'darwin';
   const key = `${os}-${arch}`;
   if (!TARGETS[key]) {
     console.error(`Unsupported platform: ${key}`);

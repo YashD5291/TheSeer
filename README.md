@@ -88,78 +88,88 @@ Zero API keys required. Everything runs through browser sessions you're already 
 
 ---
 
-## Setup Guide
+## Quick Start
 
 ### Prerequisites
 
 - Google Chrome
-- Grok account (free at [grok.com](https://grok.com))
-- Claude account (free at [claude.ai](https://claude.ai))
+- [Node.js](https://nodejs.org) (>= 18) and [pnpm](https://pnpm.io)
+- [Grok](https://grok.com) account (free)
+- [Claude](https://claude.ai) account (free)
 
-### 1. Install the Extension
+### Install
+
+**macOS / Linux:**
 
 ```bash
 git clone https://github.com/YashD5291/TheSeer.git
 cd TheSeer
-pnpm install
+./install.sh
 ```
 
-Build the extension:
+**Windows** (PowerShell):
+
+```powershell
+git clone https://github.com/YashD5291/TheSeer.git
+cd TheSeer
+powershell -ExecutionPolicy Bypass -File install.ps1
+```
+
+The installer walks you through everything — builds the extension, downloads the PDF generator, asks where to save resumes, and registers the native messaging host. Just follow the prompts.
+
+After setup, restart Chrome, import your profile (extension icon → Settings), and you're ready to go.
+
+### Change output directory
 
 ```bash
-cd apps/extension
-node build.mjs
+~/.theseer/bin/theseer-pdf --set-output ~/Desktop/Resumes
 ```
 
-Load in Chrome:
+### Dashboard (Optional)
+
+The extension tracks every application to a hosted dashboard. To use your own:
+
+1. Fork [TheSeer-Dashboard](https://github.com/YashD5291/TheSeer-Dashboard)
+2. Deploy to Vercel
+3. Add `MONGODB_URI` env var in Vercel (free MongoDB Atlas cluster)
+4. Update `dashboardUrl` in extension storage or modify the default in `src/shared/storage.ts`
+
+<details>
+<summary><strong>Manual Setup</strong> (if you prefer step-by-step)</summary>
+
+#### 1. Build the extension
+
+```bash
+pnpm install
+cd apps/extension && node build.mjs
+```
+
+#### 2. Load in Chrome
 
 1. Go to `chrome://extensions`
 2. Enable **Developer mode** (top right)
-3. Click **Load unpacked**
-4. Select the `apps/extension/` folder
-5. Copy your **Extension ID** (shown under the extension name)
+3. Click **Load unpacked** → select `apps/extension/`
+4. Copy your **Extension ID**
 
-### 2. Install the PDF Generator
+#### 3. Install the PDF generator
 
-Download the latest release for your OS from the [Releases page](https://github.com/YashD5291/TheSeer/releases), or build from source:
+Download from the [Releases page](https://github.com/YashD5291/TheSeer/releases) or build from source:
 
 ```bash
-# Install bun if you don't have it
-brew install oven-sh/bun/bun    # macOS
-# or: curl -fsSL https://bun.sh/install | bash
-
-# Build the binary
-cd apps/resume-gen
-bun run build.ts
+cd apps/resume-gen && bun run build.ts
 ```
 
-Run the installer — you must specify where generated resumes should be saved:
+Run setup (output directory is required):
 
 ```bash
-# From the extracted archive or build output:
 ./theseer-pdf --setup YOUR_EXTENSION_ID --output-dir ~/Resumes
-
-# Or via the install script:
-./dist/theseer-pdf-macos-arm64/install.sh YOUR_EXTENSION_ID
 ```
 
-This installs to `~/.theseer/` and registers the Chrome native messaging host.
+#### 4. Import your profile
 
-Change the output directory anytime:
+Click the extension icon → **Settings** → drag your `seer-profile-export.json` into the import area.
 
-```bash
-theseer-pdf --set-output ~/Desktop/Resumes
-```
-
-**Restart Chrome** after installation.
-
-### 3. Import Your Profile
-
-1. Click the Seer extension icon > **Settings** (bottom of popup)
-2. Drag your `seer-profile-export.json` into the import area
-3. Your skills, experience, and Claude prompt templates are now loaded
-
-The profile JSON should have this structure:
+The profile JSON structure:
 
 ```json
 {
@@ -187,22 +197,11 @@ The profile JSON should have this structure:
 }
 ```
 
-### 4. Use It
+#### 5. Restart Chrome and try it
 
-1. Visit any job posting (LinkedIn, Indeed, Greenhouse, Lever, Workday, etc.)
-2. Click the **S** button (bottom right)
-3. Wait for the score + analysis panel
-4. Claude auto-submits a tailored resume prompt
-5. When Claude finishes, click **View PDF** or **Copy Resume**
+Visit any job posting → click the **S** button (bottom right).
 
-### 5. Dashboard (Optional)
-
-The extension tracks everything to a hosted dashboard. The default points to the production instance. To use your own:
-
-1. Fork [TheSeer-Dashboard](https://github.com/YashD5291/TheSeer-Dashboard)
-2. Deploy to Vercel
-3. Add `MONGODB_URI` env var in Vercel (free MongoDB Atlas cluster)
-4. Update `dashboardUrl` in extension storage or modify the default in `src/shared/storage.ts`
+</details>
 
 ---
 
