@@ -178,141 +178,158 @@ function renderPromptCards() {
   promptsList.innerHTML = '';
 
   for (const meta of PROMPT_REGISTRY) {
-    const saved = promptValues[meta.key];
-    const displayValue = saved || meta.defaultValue;
-    const isModified = meta.category === 'system' && !!saved;
-    const isEmpty = !displayValue;
+    const isModified = meta.category === 'system' && !!promptValues[meta.key];
 
-    const card = document.createElement('div');
-    card.className = 'rounded-lg border border-zinc-200 bg-zinc-50/50 overflow-hidden';
-    card.dataset.key = meta.key;
+    const row = document.createElement('div');
+    row.className = 'flex items-start justify-between px-4 py-3 rounded-lg border border-zinc-200 bg-zinc-50/50 hover:border-zinc-300 transition-colors';
 
     const categoryClass = meta.category === 'system'
       ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
       : 'bg-violet-50 text-violet-700 border-violet-200';
 
-    card.innerHTML = `
-      <div class="flex items-center justify-between px-4 py-3 cursor-pointer select-none" data-toggle>
-        <div class="flex items-center gap-2.5">
-          <svg class="w-3.5 h-3.5 text-zinc-400 transition-transform duration-200" data-chevron fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
-            <path stroke-linecap="round" stroke-linejoin="round" d="m8.25 4.5 7.5 7.5-7.5 7.5" />
-          </svg>
+    row.innerHTML = `
+      <div class="flex-1 min-w-0">
+        <div class="flex items-center gap-2 mb-1">
           <span class="text-sm font-medium text-zinc-800">${meta.title}</span>
           ${isModified ? '<span class="text-[10px] font-medium px-1.5 py-0.5 rounded bg-amber-50 text-amber-700 border border-amber-200">Modified</span>' : ''}
           <span class="text-[10px] font-medium px-1.5 py-0.5 rounded border ${categoryClass}">${meta.category}</span>
         </div>
-        <button class="text-xs font-medium text-zinc-400 hover:text-zinc-700 transition-colors px-2 py-1 cursor-pointer" data-edit-btn>Edit</button>
+        <p class="text-xs text-zinc-400 leading-relaxed">${meta.description}</p>
       </div>
-      <div class="hidden" data-body>
-        <div class="px-4 pb-4">
-          <p class="text-xs text-zinc-400 mb-3">${meta.description}</p>
-          ${isEmpty
-            ? '<p class="text-xs italic text-zinc-400 py-4 text-center">No template loaded. Import a profile to populate.</p>'
-            : `<div class="rounded-lg overflow-hidden border border-zinc-800">
-                <textarea readonly class="editor-textarea w-full px-4 py-3 text-xs font-mono leading-relaxed bg-zinc-900 text-zinc-300 focus:outline-none">${escapeHtml(displayValue)}</textarea>
-              </div>`
-          }
-        </div>
-      </div>
+      <button class="text-xs font-medium text-zinc-400 hover:text-zinc-700 transition-colors px-2 py-1 cursor-pointer shrink-0 ml-4" data-edit-btn>Edit</button>
     `;
 
-    // Toggle expand/collapse
-    const toggleEl = card.querySelector('[data-toggle]')!;
-    const bodyEl = card.querySelector('[data-body]')!;
-    const chevron = card.querySelector('[data-chevron]') as HTMLElement;
-    const editBtn = card.querySelector('[data-edit-btn]') as HTMLButtonElement;
+    row.querySelector('[data-edit-btn]')!.addEventListener('click', () => openEditorModal(meta));
 
-    toggleEl.addEventListener('click', (e) => {
-      if ((e.target as HTMLElement).closest('[data-edit-btn]')) return;
-      bodyEl.classList.toggle('hidden');
-      chevron.style.transform = bodyEl.classList.contains('hidden') ? '' : 'rotate(90deg)';
-    });
-
-    editBtn.addEventListener('click', () => {
-      // Expand if collapsed
-      if (bodyEl.classList.contains('hidden')) {
-        bodyEl.classList.remove('hidden');
-        chevron.style.transform = 'rotate(90deg)';
-      }
-      enterEditMode(card, meta);
-    });
-
-    promptsList.appendChild(card);
+    promptsList.appendChild(row);
   }
 }
 
-function enterEditMode(card: HTMLElement, meta: typeof PROMPT_REGISTRY[number]) {
+// ─── Editor modal ─────────────────────────────────────────────────────
+
+const modal = document.getElementById('editor-modal')!;
+const modalTitle = modal.querySelector('[data-modal-title]')!;
+const modalBadge = modal.querySelector('[data-modal-badge]') as HTMLElement;
+const modalVars = modal.querySelector('[data-modal-vars]') as HTMLElement;
+const modalEditor = modal.querySelector('[data-modal-editor]') as HTMLTextAreaElement;
+const modalSave = modal.querySelector('[data-modal-save]')!;
+const modalCancel = modal.querySelector('[data-modal-cancel]')!;
+const modalReset = modal.querySelector('[data-modal-reset]') as HTMLButtonElement;
+const modalBackdrop = modal.querySelector('[data-modal-backdrop]')!;
+
+let activeModalCleanup: (() => void) | null = null;
+
+function openEditorModal(meta: typeof PROMPT_REGISTRY[number]) {
   const saved = promptValues[meta.key];
   const displayValue = saved || meta.defaultValue;
-  const bodyEl = card.querySelector('[data-body]')!;
 
-  const resetOrClear = meta.category === 'system'
-    ? '<button class="text-xs font-medium text-red-400 hover:text-red-500 transition-colors cursor-pointer" data-reset-btn>Reset to Default</button>'
-    : '<button class="text-xs font-medium text-red-400 hover:text-red-500 transition-colors cursor-pointer" data-clear-btn>Clear</button>';
+  // Title + badge
+  modalTitle.textContent = meta.title;
+  const categoryClass = meta.category === 'system'
+    ? 'bg-emerald-950 text-emerald-400 border-emerald-800'
+    : 'bg-violet-950 text-violet-400 border-violet-800';
+  modalBadge.className = `text-[10px] font-medium px-1.5 py-0.5 rounded border ${categoryClass}`;
+  modalBadge.textContent = meta.category;
 
-  bodyEl.innerHTML = `
-    <div class="px-4 pb-4">
-      <p class="text-xs text-zinc-400 mb-3">${meta.description}</p>
-      ${meta.variables && meta.variables.length > 0 ? `
-        <div class="flex flex-wrap gap-1.5 mb-3" data-vars>
-          ${meta.variables.map(v => `<button class="text-[10px] font-mono px-2 py-1 rounded bg-zinc-100 text-zinc-500 border border-zinc-200 hover:bg-zinc-200 hover:text-zinc-700 transition-colors cursor-pointer" data-var="{{${v}}}">{{${v}}}</button>`).join('')}
-        </div>
-      ` : ''}
-      <div class="rounded-lg overflow-hidden border border-zinc-700 focus-within:border-indigo-500 focus-within:ring-1 focus-within:ring-indigo-500/30 transition-all">
-        <textarea class="editor-textarea w-full px-4 py-3 text-xs font-mono leading-relaxed bg-zinc-900 text-zinc-100 focus:outline-none placeholder:text-zinc-600" data-editor>${escapeHtml(displayValue)}</textarea>
+  // Variable chips
+  if (meta.variables && meta.variables.length > 0) {
+    modalVars.classList.remove('hidden');
+    modalVars.innerHTML = `
+      <div class="flex flex-wrap gap-1.5">
+        ${meta.variables.map(v => `<button class="text-[10px] font-mono px-2 py-1 rounded bg-zinc-900 text-zinc-400 border border-zinc-700 hover:bg-zinc-800 hover:text-zinc-200 transition-colors cursor-pointer" data-var="{{${v}}}">{{${v}}}</button>`).join('')}
       </div>
-      <div class="flex items-center justify-between mt-3">
-        <div class="flex gap-2">
-          <button class="text-xs font-medium px-3 py-1.5 rounded-md bg-zinc-900 text-white hover:bg-zinc-800 transition-colors cursor-pointer" data-save-btn>Save</button>
-          <button class="text-xs font-medium px-3 py-1.5 rounded-md bg-zinc-100 text-zinc-600 hover:bg-zinc-200 transition-colors cursor-pointer" data-cancel-btn>Cancel</button>
-        </div>
-        ${resetOrClear}
-      </div>
-    </div>
-  `;
+    `;
+  } else {
+    modalVars.classList.add('hidden');
+    modalVars.innerHTML = '';
+  }
 
-  const editor = bodyEl.querySelector('[data-editor]') as HTMLTextAreaElement;
+  // Reset/Clear button
+  if (meta.category === 'system') {
+    modalReset.textContent = 'Reset to Default';
+    modalReset.classList.remove('hidden');
+  } else if (displayValue) {
+    modalReset.textContent = 'Clear';
+    modalReset.classList.remove('hidden');
+  } else {
+    modalReset.classList.add('hidden');
+  }
 
-  // Tab key inserts tab instead of moving focus
-  editor.addEventListener('keydown', (e) => {
+  // Editor content
+  modalEditor.value = displayValue;
+
+  // Show modal
+  modal.classList.remove('hidden');
+  document.body.style.overflow = 'hidden';
+  modalEditor.focus();
+
+  // Clean up previous listeners
+  if (activeModalCleanup) activeModalCleanup();
+
+  const controller = new AbortController();
+  const { signal } = controller;
+
+  // Tab key
+  modalEditor.addEventListener('keydown', (e) => {
     if (e.key === 'Tab') {
       e.preventDefault();
-      const start = editor.selectionStart;
-      const end = editor.selectionEnd;
-      editor.value = editor.value.substring(0, start) + '  ' + editor.value.substring(end);
-      editor.selectionStart = editor.selectionEnd = start + 2;
+      const start = modalEditor.selectionStart;
+      const end = modalEditor.selectionEnd;
+      modalEditor.value = modalEditor.value.substring(0, start) + '  ' + modalEditor.value.substring(end);
+      modalEditor.selectionStart = modalEditor.selectionEnd = start + 2;
     }
-  });
+    if (e.key === 'Escape') closeModal();
+  }, { signal });
 
   // Variable chip insertion
-  bodyEl.querySelectorAll('[data-var]').forEach(btn => {
+  modalVars.querySelectorAll('[data-var]').forEach(btn => {
     btn.addEventListener('click', () => {
       const varText = (btn as HTMLElement).dataset.var!;
-      const start = editor.selectionStart;
-      editor.value = editor.value.substring(0, start) + varText + editor.value.substring(editor.selectionEnd);
-      editor.selectionStart = editor.selectionEnd = start + varText.length;
-      editor.focus();
-    });
+      const start = modalEditor.selectionStart;
+      modalEditor.value = modalEditor.value.substring(0, start) + varText + modalEditor.value.substring(modalEditor.selectionEnd);
+      modalEditor.selectionStart = modalEditor.selectionEnd = start + varText.length;
+      modalEditor.focus();
+    }, { signal });
   });
 
-  // Wire buttons
-  bodyEl.querySelector('[data-save-btn]')!.addEventListener('click', () => savePrompt(meta, editor));
-  bodyEl.querySelector('[data-cancel-btn]')!.addEventListener('click', () => loadPrompts());
+  // Save
+  modalSave.addEventListener('click', async () => {
+    await savePromptFromModal(meta);
+    closeModal();
+  }, { signal });
 
-  const resetBtn = bodyEl.querySelector('[data-reset-btn]');
-  if (resetBtn) resetBtn.addEventListener('click', () => resetPrompt(meta));
+  // Cancel
+  modalCancel.addEventListener('click', () => closeModal(), { signal });
 
-  const clearBtn = bodyEl.querySelector('[data-clear-btn]');
-  if (clearBtn) clearBtn.addEventListener('click', () => clearClaudePrompt(meta));
+  // Backdrop click
+  modalBackdrop.addEventListener('click', () => closeModal(), { signal });
 
-  editor.focus();
+  // Reset / Clear
+  modalReset.addEventListener('click', async () => {
+    if (meta.category === 'system') {
+      await resetPrompt(meta);
+    } else {
+      await clearClaudePrompt(meta);
+    }
+    closeModal();
+  }, { signal });
+
+  activeModalCleanup = () => controller.abort();
 }
 
-async function savePrompt(meta: typeof PROMPT_REGISTRY[number], textarea: HTMLTextAreaElement) {
-  const value = textarea.value;
+function closeModal() {
+  modal.classList.add('hidden');
+  document.body.style.overflow = '';
+  if (activeModalCleanup) {
+    activeModalCleanup();
+    activeModalCleanup = null;
+  }
+}
+
+async function savePromptFromModal(meta: typeof PROMPT_REGISTRY[number]) {
+  const value = modalEditor.value;
 
   if (meta.category === 'system') {
-    // If value matches default exactly, treat as "no override"
     if (value === meta.defaultValue) {
       await deleteSystemPrompt(meta.key);
       promptValues[meta.key] = '';
