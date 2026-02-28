@@ -97,8 +97,23 @@ async function getInput(filePath) {
 // Phase 2: Parse Markdown
 // ================================
 
+/**
+ * Normalize LLM output before parsing:
+ *  - Strip bold/italic markers from markdown headers ("## **TEXT**" → "## TEXT")
+ *  - Handles **, ***, and __ variants
+ * This prevents format variations from Claude/Grok from breaking section extraction.
+ */
+function normalizeInput(input) {
+  return input.replace(/^(#{1,6}\s+)\*{1,3}(.+?)\*{1,3}\s*$/gm, '$1$2');
+}
+
 function extractChatTitle(input) {
-  const match = input.match(/^#\s*CHAT TITLE\s*\n\*\*(.+?)\*\*/m);
+  // Try bold-wrapped value first: "# CHAT TITLE\n**value**"
+  let match = input.match(/^#{1,6}\s+CHAT TITLE\s*\n+\s*\*{2}(.+?)\*{2}/m);
+  if (!match) {
+    // Plain text value (first non-empty line after header)
+    match = input.match(/^#{1,6}\s+CHAT TITLE\s*\n+\s*(.+)/m);
+  }
   if (!match) return null;
   return match[1]
     .replace(/\s*[-–—]\s*Resume Analysis\s*$/i, '')
@@ -107,8 +122,19 @@ function extractChatTitle(input) {
 }
 
 function extractResumeSection(input) {
-  const match = input.match(/## TAILORED RESUME\s*\n([\s\S]*?)(?=\n## CHANGELOG|\n---(?:\s*\n|$))/);
-  if (match) return match[1].trim();
+  // Greedy capture everything after "## TAILORED RESUME", then trim trailing sections
+  const match = input.match(/#{1,6}\s+TAILORED RESUME\s*\n([\s\S]+)/);
+  if (match) {
+    let content = match[1];
+    // Strip leading --- separator (sometimes appears right after the header)
+    content = content.replace(/^-{3,}\s*\n/, '');
+    // Strip trailing CHANGELOG section (with or without --- separator before it)
+    content = content.replace(/\n-{3,}\s*\n#{1,6}\s+CHANGELOG[\s\S]*$/i, '');
+    content = content.replace(/\n#{1,6}\s+CHANGELOG[\s\S]*$/i, '');
+    // Strip trailing --- separator if nothing follows
+    content = content.replace(/\n-{3,}\s*$/, '');
+    return content.trim();
+  }
 
   // Fallback: if no TAILORED RESUME header, check if input starts with resume content directly
   const hasResumeMarkers = /^# .+\n/.test(input.trim()) && /## Experience/.test(input);
@@ -513,7 +539,8 @@ async function main() {
   const { filePath, nameOverride, json } = parseArgs();
   jsonMode = json;
 
-  const input = await getInput(filePath);
+  const rawInput = await getInput(filePath);
+  const input = normalizeInput(rawInput);
 
   // Derive folder name
   let folderName = nameOverride || extractChatTitle(input);

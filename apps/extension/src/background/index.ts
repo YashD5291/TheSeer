@@ -442,26 +442,6 @@ async function onClaudeResponseComplete(state: ClaudePollState, hookChatUrl?: st
     }
   }).catch(() => {});
 
-  // OS notification
-  const notifId = `seer-claude-${Date.now()}`;
-  chrome.notifications.create(notifId, {
-    type: 'basic',
-    iconUrl: chrome.runtime.getURL('icons/icon128.png'),
-    title: 'The Seer',
-    message: 'Claude has finished responding — click to review',
-  }, (createdId) => {
-    if (chrome.runtime.lastError) {
-      console.error(`[Seer BG] Notification failed: ${chrome.runtime.lastError.message}`);
-    } else {
-      console.log(`[Seer BG] Notification created: ${createdId}`);
-    }
-  });
-
-  // Persist notification data (survives worker restarts)
-  await chrome.storage.session.set({
-    [`seer_notif_${notifId}`]: { chatUrl, tabId: state.claudeTabId },
-  });
-
   // Update JD tab panel with chat link + response text
   chrome.tabs.sendMessage(state.jdTabId, {
     type: 'SEER_CLAUDE_RESPONSE_COMPLETE',
@@ -475,11 +455,11 @@ async function onClaudeResponseComplete(state: ClaudePollState, hookChatUrl?: st
     const cleanTitle = state.jobTitle?.replace(new RegExp(`\\s*@\\s*${state.jobCompany}\\s*$`, 'i'), '') || '';
     const chatTitle = (state.jobCompany && cleanTitle) ? `${state.jobCompany} - ${cleanTitle}` : '';
     console.log(`[Seer BG] PDF: chatTitle="${chatTitle}"`);
-    triggerPdfGeneration(responseText, chatTitle, state.jdTabId);
+    triggerPdfGeneration(responseText, chatTitle, state.jdTabId, state.jobCompany, cleanTitle);
   }
 }
 
-function triggerPdfGeneration(responseText: string, chatTitle: string, jdTabId: number) {
+function triggerPdfGeneration(responseText: string, chatTitle: string, jdTabId: number, jobCompany?: string, jobTitle?: string) {
   console.log(`[Seer BG] Triggering PDF generation (chatTitle: "${chatTitle}")`);
   const pdfStartedAt = Date.now();
 
@@ -503,6 +483,28 @@ function triggerPdfGeneration(responseText: string, chatTitle: string, jdTabId: 
           pdfPath: response.pdfPath,
           folderName: response.folderName,
         }).catch(() => {});
+
+        // OS notification — dynamic title based on available job info
+        const notifTitle = (jobCompany && jobTitle) ? `${jobCompany} — ${jobTitle}`
+          : jobCompany ? `${jobCompany} — Resume Ready`
+          : jobTitle ? `${jobTitle} — Resume Ready`
+          : 'The Seer';
+        const notifId = `seer-pdf-${Date.now()}`;
+        chrome.notifications.create(notifId, {
+          type: 'basic',
+          iconUrl: chrome.runtime.getURL('icons/icon128.png'),
+          title: notifTitle,
+          message: 'Your tailored resume is ready — click to open',
+        }, (createdId) => {
+          if (chrome.runtime.lastError) {
+            console.error(`[Seer BG] Notification failed: ${chrome.runtime.lastError.message}`);
+          } else {
+            console.log(`[Seer BG] Notification created: ${createdId}`);
+          }
+        });
+        chrome.storage.session.set({
+          [`seer_notif_${notifId}`]: { pdfPath: response.pdfPath },
+        });
 
         // ── Track resume in dashboard (fire-and-forget) ──
         const pdfMs = Date.now() - pdfStartedAt;
@@ -532,14 +534,9 @@ function triggerPdfGeneration(responseText: string, chatTitle: string, jdTabId: 
 chrome.notifications.onClicked.addListener(async (notifId) => {
   const key = `seer_notif_${notifId}`;
   const data = await chrome.storage.session.get(key);
-  const info = data[key] as { chatUrl: string; tabId: number } | undefined;
-  if (info) {
-    chrome.tabs.update(info.tabId, { active: true }).catch(() => {});
-    chrome.tabs.get(info.tabId).then(tab => {
-      if (tab.windowId) {
-        chrome.windows.update(tab.windowId, { focused: true }).catch(() => {});
-      }
-    }).catch(() => {});
+  const info = data[key] as { pdfPath: string } | undefined;
+  if (info?.pdfPath) {
+    chrome.tabs.create({ url: `file://${info.pdfPath}` });
     await chrome.storage.session.remove(key);
   }
   chrome.notifications.clear(notifId);
