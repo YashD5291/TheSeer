@@ -1,7 +1,8 @@
 import { extractPageContent } from '../scrapers/index.js';
 
-// Avoid injecting multiple times
-if (!(window as any).__seerInjected) {
+// Avoid injecting on non-web pages and multiple times
+const _href = window.location.href;
+if (/^https?:\/\//.test(_href) && !(window as any).__seerInjected) {
   (window as any).__seerInjected = true;
   init();
 }
