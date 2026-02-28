@@ -77,22 +77,28 @@ function renderJobData(data: ScrapedJob) {
   const score = deepAnalysis?.fit_score ?? 0;
   const pass = deepAnalysis ? deepAnalysis.fit_score >= 40 : false;
 
+  const ringColor = pass ? 'border-emerald-500' : 'border-red-500';
+  const scoreColor = pass ? 'text-emerald-600' : 'text-red-500';
+  const labelColor = pass ? 'text-emerald-600' : 'text-red-500';
+
   let html = `
-    <div class="score-section">
-      <div class="score-circle ${pass ? 'score-pass' : 'score-fail'}">${score}</div>
-      <div class="score-label">${pass ? 'Good Fit' : 'Weak Fit'}</div>
-      <div class="job-info">${job.title} @ ${job.company}</div>
-      ${job.location ? `<div class="job-info">${job.location}</div>` : ''}
-      ${job.salary_range ? `<div class="job-info">${job.salary_range}</div>` : ''}
+    <div class="text-center pb-4 mb-4 border-b border-zinc-200">
+      <div class="inline-flex items-center justify-center w-[72px] h-[72px] rounded-full border-[3px] ${ringColor} mb-2">
+        <span class="text-2xl font-bold ${scoreColor}">${score}</span>
+      </div>
+      <div class="text-sm font-semibold ${labelColor} mb-1">${pass ? 'Good Fit' : 'Weak Fit'}</div>
+      <div class="text-xs text-zinc-500">${job.title} @ ${job.company}</div>
+      ${job.location ? `<div class="text-xs text-zinc-400">${job.location}</div>` : ''}
+      ${job.salary_range ? `<div class="text-xs text-zinc-400">${job.salary_range}</div>` : ''}
     </div>
   `;
 
   if (deepAnalysis && deepAnalysis.key_matches.length > 0) {
     html += `
-      <div class="section">
-        <h3>Key Matches (${deepAnalysis.key_matches.length})</h3>
-        <div class="skills-list">
-          ${deepAnalysis.key_matches.map(s => `<span class="skill-tag skill-matched">${s}</span>`).join('')}
+      <div class="mb-4">
+        <h3 class="text-[11px] font-semibold text-zinc-400 uppercase tracking-wider mb-2">Key Matches (${deepAnalysis.key_matches.length})</h3>
+        <div class="flex flex-wrap gap-1">
+          ${deepAnalysis.key_matches.map(s => `<span class="text-[11px] font-medium px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">${s}</span>`).join('')}
         </div>
       </div>
     `;
@@ -103,11 +109,11 @@ function renderJobData(data: ScrapedJob) {
   }
 
   if (deepAnalysis && !claudePrompt) {
-    html += `<button class="btn btn-primary" id="btn-prompt">Generate Claude Prompt</button>`;
+    html += `<button class="w-full py-2.5 rounded-lg text-sm font-semibold bg-zinc-900 text-white hover:bg-zinc-800 transition-colors cursor-pointer border-none mb-2" id="btn-prompt">Generate Claude Prompt</button>`;
   }
 
   if (claudePrompt) {
-    html += `<button class="btn btn-success" id="btn-copy">Copy Prompt to Clipboard</button>`;
+    html += `<button class="w-full py-2.5 rounded-lg text-sm font-semibold bg-emerald-600 text-white hover:bg-emerald-700 transition-colors cursor-pointer border-none mb-2" id="btn-copy">Copy Prompt to Clipboard</button>`;
   }
 
   contentEl.innerHTML = html;
@@ -117,38 +123,47 @@ function renderJobData(data: ScrapedJob) {
 }
 
 function renderDeepAnalysis(analysis: FitAnalysis): string {
+  const recClass: Record<string, string> = {
+    strong_yes: 'bg-emerald-50 text-emerald-700',
+    yes: 'bg-blue-50 text-blue-700',
+    maybe: 'bg-amber-50 text-amber-700',
+    no: 'bg-red-50 text-red-700',
+  };
+
   let html = `
-    <div class="section">
-      <h3>Deep Analysis</h3>
-      <div class="analysis-row">
-        <span class="analysis-label">Confidence</span>
-        <span class="analysis-value">${analysis.confidence}%</span>
-      </div>
-      <div class="analysis-row">
-        <span class="analysis-label">Recommended Base</span>
-        <span class="analysis-value">${analysis.recommended_base}</span>
-      </div>
-      <div class="analysis-row">
-        <span class="analysis-label">Competition</span>
-        <span class="analysis-value">${analysis.estimated_competition}</span>
-      </div>
-      <div class="analysis-row">
-        <span class="analysis-label">Recommendation</span>
-        <span class="analysis-value">
-          <span class="recommendation rec-${analysis.apply_recommendation}">
-            ${analysis.apply_recommendation.replace('_', ' ')}
+    <div class="mb-4">
+      <h3 class="text-[11px] font-semibold text-zinc-400 uppercase tracking-wider mb-2">Deep Analysis</h3>
+      <div class="divide-y divide-zinc-100">
+        <div class="flex justify-between py-1.5 text-sm">
+          <span class="text-zinc-500">Confidence</span>
+          <span class="font-semibold text-zinc-800">${analysis.confidence}%</span>
+        </div>
+        <div class="flex justify-between py-1.5 text-sm">
+          <span class="text-zinc-500">Recommended Base</span>
+          <span class="font-semibold text-zinc-800">${analysis.recommended_base}</span>
+        </div>
+        <div class="flex justify-between py-1.5 text-sm">
+          <span class="text-zinc-500">Competition</span>
+          <span class="font-semibold text-zinc-800">${analysis.estimated_competition}</span>
+        </div>
+        <div class="flex justify-between py-1.5 text-sm">
+          <span class="text-zinc-500">Recommendation</span>
+          <span class="font-semibold">
+            <span class="text-xs px-2 py-0.5 rounded ${recClass[analysis.apply_recommendation] || 'bg-zinc-100 text-zinc-600'}">
+              ${analysis.apply_recommendation.replace('_', ' ')}
+            </span>
           </span>
-        </span>
+        </div>
       </div>
     </div>
   `;
 
   if (analysis.gaps.length > 0) {
     html += `
-      <div class="section">
-        <h3>Gaps (${analysis.gaps.length})</h3>
-        <div class="skills-list">
-          ${analysis.gaps.map(g => `<span class="skill-tag skill-gap">${g}</span>`).join('')}
+      <div class="mb-4">
+        <h3 class="text-[11px] font-semibold text-zinc-400 uppercase tracking-wider mb-2">Gaps (${analysis.gaps.length})</h3>
+        <div class="flex flex-wrap gap-1">
+          ${analysis.gaps.map(g => `<span class="text-[11px] font-medium px-2 py-0.5 rounded-full bg-red-50 text-red-700 border border-red-200">${g}</span>`).join('')}
         </div>
       </div>
     `;
@@ -156,9 +171,9 @@ function renderDeepAnalysis(analysis: FitAnalysis): string {
 
   if (analysis.red_flags.length > 0) {
     html += `
-      <div class="section">
-        <h3>Red Flags</h3>
-        ${analysis.red_flags.map(f => `<div class="error">${f}</div>`).join('')}
+      <div class="mb-4">
+        <h3 class="text-[11px] font-semibold text-zinc-400 uppercase tracking-wider mb-2">Red Flags</h3>
+        ${analysis.red_flags.map(f => `<div class="text-xs px-3 py-2 rounded-lg bg-red-50 text-red-700 border border-red-200 mb-1.5">${f}</div>`).join('')}
       </div>
     `;
   }
@@ -171,6 +186,7 @@ async function generatePrompt(data: ScrapedJob) {
   if (btn) {
     btn.disabled = true;
     btn.textContent = 'Generating...';
+    btn.classList.add('opacity-40', 'cursor-not-allowed');
   }
 
   try {
@@ -182,7 +198,7 @@ async function generatePrompt(data: ScrapedJob) {
     });
 
     if (response?.type === 'ERROR') {
-      contentEl.innerHTML += `<div class="error">${response.message}</div>`;
+      contentEl.innerHTML += `<div class="text-xs px-3 py-2 rounded-lg bg-red-50 text-red-700 border border-red-200 mb-2">${response.message}</div>`;
       return;
     }
 
@@ -191,7 +207,7 @@ async function generatePrompt(data: ScrapedJob) {
       renderJobData(data);
     }
   } catch (err: any) {
-    contentEl.innerHTML += `<div class="error">${err.message}</div>`;
+    contentEl.innerHTML += `<div class="text-xs px-3 py-2 rounded-lg bg-red-50 text-red-700 border border-red-200 mb-2">${err.message}</div>`;
   }
 }
 

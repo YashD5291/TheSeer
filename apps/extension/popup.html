@@ -4,362 +4,70 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>The Seer</title>
+  <link rel="stylesheet" href="dist/tailwind.css">
   <style>
-    * { margin: 0; padding: 0; box-sizing: border-box; }
-
-    body {
-      width: 380px;
-      min-height: 200px;
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-      background: #f8f9fa;
-      color: #1a1a2e;
+    body { width: 380px; min-height: 200px; }
+    /* Toggle switch — too custom for pure Tailwind */
+    .toggle-track {
+      position: relative; display: inline-block; width: 36px; height: 20px; cursor: pointer;
     }
-
-    .header {
-      background: #1a1a2e;
-      color: #f0f0f4;
-      padding: 14px 20px;
-      display: flex;
-      align-items: center;
-      gap: 12px;
-    }
-
-    .header-icon {
-      width: 32px;
-      height: 32px;
-      background: rgba(255,255,255,0.08);
-      border: 1px solid rgba(255,255,255,0.12);
-      border-radius: 8px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-size: 15px;
-      font-weight: 700;
-      color: #e0e0e8;
-    }
-
-    .header h1 {
-      font-size: 15px;
-      font-weight: 600;
-      letter-spacing: 0.2px;
-    }
-
-    .header p {
-      font-size: 11px;
-      color: #8b8b9e;
-    }
-
-    .header-right {
-      margin-left: auto;
-    }
-
-    .toggle {
-      position: relative;
-      display: inline-block;
-      width: 36px;
-      height: 20px;
-      cursor: pointer;
-    }
-
-    .toggle input {
-      position: absolute;
-      opacity: 0;
-      width: 0;
-      height: 0;
-    }
-
+    .toggle-track input { position: absolute; opacity: 0; width: 0; height: 0; }
     .toggle-slider {
-      position: absolute;
-      inset: 0;
-      background: #3a3a50;
-      border-radius: 10px;
-      transition: background 0.2s;
+      position: absolute; inset: 0; background: #3f3f46; border-radius: 10px; transition: background 0.2s;
     }
-
     .toggle-slider::before {
-      content: '';
-      position: absolute;
-      width: 14px;
-      height: 14px;
-      left: 3px;
-      top: 3px;
-      background: #8b8b9e;
-      border-radius: 50%;
+      content: ''; position: absolute; width: 14px; height: 14px;
+      left: 3px; top: 3px; background: #71717a; border-radius: 50%;
       transition: transform 0.2s, background 0.2s;
     }
-
-    .toggle input:checked + .toggle-slider {
-      background: #22c55e;
+    .toggle-track input:checked + .toggle-slider { background: #22c55e; }
+    .toggle-track input:checked + .toggle-slider::before { transform: translateX(16px); background: white; }
+    /* Mini toggle */
+    .mini-track {
+      position: relative; display: inline-block; width: 28px; height: 16px; cursor: pointer;
     }
-
-    .toggle input:checked + .toggle-slider::before {
-      transform: translateX(16px);
-      background: white;
+    .mini-track input { position: absolute; opacity: 0; width: 0; height: 0; }
+    .mini-slider {
+      position: absolute; inset: 0; background: #d4d4d8; border-radius: 8px; transition: background 0.2s;
     }
-
-    .content {
-      padding: 16px 20px;
-    }
-
-    .empty-state {
-      text-align: center;
-      padding: 28px 16px;
-      color: #71717a;
-    }
-
-    .empty-state p {
-      font-size: 14px;
-      margin-bottom: 8px;
-    }
-
-    .empty-state .hint {
-      font-size: 12px;
-      color: #a1a1aa;
-    }
-
-    .score-section {
-      text-align: center;
-      padding: 20px 0;
-      border-bottom: 1px solid #e4e4e7;
-      margin-bottom: 16px;
-    }
-
-    .score-circle {
-      width: 72px;
-      height: 72px;
-      border-radius: 50%;
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      font-size: 26px;
-      font-weight: 700;
-      color: white;
-      margin-bottom: 8px;
-    }
-
-    .score-pass { background: #16a34a; }
-    .score-fail { background: #dc2626; }
-
-    .score-label {
-      font-size: 13px;
-      font-weight: 600;
-      color: #3f3f46;
-      margin-bottom: 4px;
-    }
-
-    .job-info {
-      font-size: 12px;
-      color: #71717a;
-    }
-
-    .section {
-      margin-bottom: 16px;
-    }
-
-    .section h3 {
-      font-size: 11px;
-      font-weight: 600;
-      color: #71717a;
-      margin-bottom: 8px;
-      text-transform: uppercase;
-      letter-spacing: 0.5px;
-    }
-
-    .skills-list {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 4px;
-    }
-
-    .skill-tag {
-      padding: 2px 8px;
-      border-radius: 4px;
-      font-size: 11px;
-      font-weight: 500;
-    }
-
-    .skill-matched {
-      background: #dcfce7;
-      color: #166534;
-    }
-
-    .skill-gap {
-      background: #fee2e2;
-      color: #991b1b;
-    }
-
-    .analysis-row {
-      display: flex;
-      justify-content: space-between;
-      padding: 6px 0;
-      font-size: 13px;
-      border-bottom: 1px solid #f4f4f5;
-    }
-
-    .analysis-row:last-child {
-      border-bottom: none;
-    }
-
-    .analysis-label { color: #71717a; }
-    .analysis-value { font-weight: 600; color: #27272a; }
-
-    .btn {
-      width: 100%;
-      padding: 10px 16px;
-      border: none;
-      border-radius: 8px;
-      font-size: 13px;
-      font-weight: 600;
-      cursor: pointer;
-      transition: background 0.15s;
-      margin-bottom: 8px;
-    }
-
-    .btn-primary {
-      background: #1a1a2e;
-      color: white;
-    }
-
-    .btn-primary:hover { background: #2a2a42; }
-    .btn-primary:disabled {
-      opacity: 0.4;
-      cursor: not-allowed;
-    }
-
-    .btn-secondary {
-      background: #f4f4f5;
-      color: #3f3f46;
-    }
-
-    .btn-secondary:hover { background: #e4e4e7; }
-
-    .btn-success {
-      background: #16a34a;
-      color: white;
-    }
-
-    .btn-success:hover { background: #15803d; }
-
-    .footer {
-      padding: 10px 20px;
-      border-top: 1px solid #e4e4e7;
-      text-align: center;
-    }
-
-    .footer a {
-      font-size: 12px;
-      color: #71717a;
-      text-decoration: none;
-    }
-
-    .footer a:hover { color: #3f3f46; text-decoration: underline; }
-
-    .model-bar {
-      padding: 10px 20px;
-      border-bottom: 1px solid #e4e4e7; background: #fafafa;
-    }
-    .model-row {
-      display: flex; gap: 10px; margin-bottom: 8px;
-    }
-    .toggle-row {
-      display: flex; gap: 16px;
-    }
-    .model-group { flex: 1; }
-    .model-label {
-      font-size: 10px; font-weight: 600; color: #71717a;
-      text-transform: uppercase; letter-spacing: 0.4px; margin-bottom: 3px;
-    }
-    .model-select {
-      width: 100%; padding: 5px 8px; border: 1px solid #d4d4d8;
-      border-radius: 5px; font-size: 12px; font-family: inherit;
-      background: #fff; color: #27272a; cursor: pointer;
-      outline: none;
-    }
-    .model-select:focus { border-color: #1a1a2e; }
-    .ext-toggle {
-      display: flex; align-items: center; gap: 6px;
-      white-space: nowrap;
-    }
-    .ext-toggle label {
-      font-size: 11px; font-weight: 600; color: #71717a;
-      text-transform: uppercase; letter-spacing: 0.3px; cursor: pointer;
-    }
-    .mini-toggle {
-      position: relative; display: inline-block;
-      width: 28px; height: 16px; cursor: pointer;
-    }
-    .mini-toggle input { position: absolute; opacity: 0; width: 0; height: 0; }
-    .mini-toggle-slider {
-      position: absolute; inset: 0; background: #d4d4d8;
-      border-radius: 8px; transition: background 0.2s;
-    }
-    .mini-toggle-slider::before {
+    .mini-slider::before {
       content: ''; position: absolute; width: 12px; height: 12px;
       left: 2px; top: 2px; background: white; border-radius: 50%;
       transition: transform 0.2s;
     }
-    .mini-toggle input:checked + .mini-toggle-slider { background: #1a1a2e; }
-    .mini-toggle input:checked + .mini-toggle-slider::before { transform: translateX(12px); }
-
-    .loading {
-      text-align: center;
-      padding: 16px;
-      color: #71717a;
-      font-size: 14px;
-    }
-
-    .error {
-      padding: 10px 12px;
-      background: #fef2f2;
-      border: 1px solid #fecaca;
-      border-radius: 6px;
-      color: #991b1b;
-      font-size: 12px;
-      margin-bottom: 12px;
-    }
-
-    .recommendation {
-      display: inline-block;
-      padding: 2px 10px;
-      border-radius: 4px;
-      font-size: 12px;
-      font-weight: 600;
-    }
-
-    .rec-strong_yes { background: #dcfce7; color: #166534; }
-    .rec-yes { background: #dbeafe; color: #1e40af; }
-    .rec-maybe { background: #fef3c7; color: #92400e; }
-    .rec-no { background: #fee2e2; color: #991b1b; }
+    .mini-track input:checked + .mini-slider { background: #18181b; }
+    .mini-track input:checked + .mini-slider::before { transform: translateX(12px); }
   </style>
 </head>
-<body>
-  <div class="header">
-    <div class="header-icon">S</div>
-    <div>
-      <h1>The Seer</h1>
-      <p>Resume Fit Checker</p>
+<body class="bg-zinc-50 text-zinc-900 antialiased">
+
+  <!-- Header -->
+  <div class="bg-zinc-900 text-zinc-100 px-5 py-3.5 flex items-center gap-3">
+    <div class="w-8 h-8 rounded-lg bg-white/[0.08] border border-white/[0.12] flex items-center justify-center text-sm font-bold text-zinc-200">S</div>
+    <div class="flex-1">
+      <h1 class="text-sm font-semibold tracking-wide">The Seer</h1>
+      <p class="text-[11px] text-zinc-500">Resume Fit Checker</p>
     </div>
-    <div class="header-right">
-      <label class="toggle" title="Enable/disable Seer">
-        <input type="checkbox" id="seer-toggle" checked>
-        <span class="toggle-slider"></span>
-      </label>
-    </div>
+    <label class="toggle-track" title="Enable/disable Seer">
+      <input type="checkbox" id="seer-toggle" checked>
+      <span class="toggle-slider"></span>
+    </label>
   </div>
 
-  <div class="model-bar">
-    <div class="model-row">
-      <div class="model-group">
-        <div class="model-label">Grok Model</div>
-        <select class="model-select" id="grok-model">
+  <!-- Model Bar -->
+  <div class="px-5 py-3 border-b border-zinc-200 bg-zinc-50/80">
+    <div class="flex gap-2.5 mb-2.5">
+      <div class="flex-1">
+        <div class="text-[10px] font-semibold text-zinc-400 uppercase tracking-wider mb-1">Grok</div>
+        <select id="grok-model" class="w-full px-2.5 py-1.5 text-xs bg-white border border-zinc-200 rounded-md text-zinc-700 focus:outline-none focus:border-zinc-900 cursor-pointer">
           <option value="Fast">Fast</option>
           <option value="Expert">Expert</option>
           <option value="Auto">Auto</option>
         </select>
       </div>
-      <div class="model-group">
-        <div class="model-label">Claude Model</div>
-        <select class="model-select" id="claude-model">
+      <div class="flex-1">
+        <div class="text-[10px] font-semibold text-zinc-400 uppercase tracking-wider mb-1">Claude</div>
+        <select id="claude-model" class="w-full px-2.5 py-1.5 text-xs bg-white border border-zinc-200 rounded-md text-zinc-700 focus:outline-none focus:border-zinc-900 cursor-pointer">
           <option value="Sonnet 4.5">Sonnet 4.5</option>
           <option value="Sonnet 4.6">Sonnet 4.6</option>
           <option value="Haiku 4.5">Haiku 4.5</option>
@@ -368,33 +76,35 @@
         </select>
       </div>
     </div>
-    <div class="toggle-row">
-      <div class="ext-toggle">
-        <span class="mini-toggle" title="Extended thinking">
+    <div class="flex gap-5">
+      <div class="flex items-center gap-1.5">
+        <span class="mini-track" title="Extended thinking">
           <input type="checkbox" id="claude-thinking">
-          <span class="mini-toggle-slider"></span>
+          <span class="mini-slider"></span>
         </span>
-        <label for="claude-thinking">Think</label>
+        <label for="claude-thinking" class="text-[11px] font-semibold text-zinc-400 uppercase tracking-wide cursor-pointer">Think</label>
       </div>
-      <div class="ext-toggle">
-        <span class="mini-toggle" title="Append Seer analysis context to Claude prompt">
+      <div class="flex items-center gap-1.5">
+        <span class="mini-track" title="Append Seer analysis context to Claude prompt">
           <input type="checkbox" id="seer-context">
-          <span class="mini-toggle-slider"></span>
+          <span class="mini-slider"></span>
         </span>
-        <label for="seer-context">Context</label>
+        <label for="seer-context" class="text-[11px] font-semibold text-zinc-400 uppercase tracking-wide cursor-pointer">Context</label>
       </div>
     </div>
   </div>
 
-  <div class="content" id="content">
-    <div class="empty-state" id="empty-state">
-      <p>No job analyzed yet</p>
-      <p class="hint">Click the Seer button on a job posting page to analyze fit.</p>
+  <!-- Content -->
+  <div class="px-5 py-4" id="content">
+    <div id="empty-state" class="text-center py-8">
+      <p class="text-sm text-zinc-500 mb-1.5">No job analyzed yet</p>
+      <p class="text-xs text-zinc-400">Click the Seer button on a job posting to analyze fit.</p>
     </div>
   </div>
 
-  <div class="footer">
-    <a href="#" id="options-link">Settings</a>
+  <!-- Footer -->
+  <div class="px-5 py-2.5 border-t border-zinc-200 text-center">
+    <a href="#" id="options-link" class="text-xs text-zinc-400 no-underline hover:text-zinc-600 transition-colors">Settings</a>
   </div>
 
   <script type="module" src="dist/popup.js"></script>

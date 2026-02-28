@@ -24,19 +24,16 @@ async function init() {
 // File import via drag & drop
 fileDrop.addEventListener('dragover', (e) => {
   e.preventDefault();
-  fileDrop.style.borderColor = '#3f3f46';
-  fileDrop.style.background = '#fafafa';
+  fileDrop.classList.add('border-zinc-400', 'bg-zinc-50');
 });
 
 fileDrop.addEventListener('dragleave', () => {
-  fileDrop.style.borderColor = '#d1d5db';
-  fileDrop.style.background = '';
+  fileDrop.classList.remove('border-zinc-400', 'bg-zinc-50');
 });
 
 fileDrop.addEventListener('drop', (e) => {
   e.preventDefault();
-  fileDrop.style.borderColor = '#d1d5db';
-  fileDrop.style.background = '';
+  fileDrop.classList.remove('border-zinc-400', 'bg-zinc-50');
 
   const file = e.dataTransfer?.files[0];
   if (file) handleFile(file);
@@ -71,27 +68,29 @@ async function handleFile(file: File) {
     await loadPrompts();
 
     // Show summary
-    profileSummary.style.display = 'block';
+    profileSummary.classList.remove('hidden');
     profileSummary.innerHTML = `
-      <div class="stat">
-        <span class="stat-label">Expert skills</span>
-        <span class="stat-value">${profile.skills_expert.length}</span>
-      </div>
-      <div class="stat">
-        <span class="stat-label">Proficient skills</span>
-        <span class="stat-value">${profile.skills_proficient.length}</span>
-      </div>
-      <div class="stat">
-        <span class="stat-label">Familiar skills</span>
-        <span class="stat-value">${profile.skills_familiar.length}</span>
-      </div>
-      <div class="stat">
-        <span class="stat-label">Experience</span>
-        <span class="stat-value">${profile.experience_years} years</span>
-      </div>
-      <div class="stat">
-        <span class="stat-label">Prompt templates</span>
-        <span class="stat-value">${Object.values(prompts).filter(p => p.length > 0).length}/3</span>
+      <div class="mt-4 rounded-lg bg-zinc-50 border border-zinc-200 divide-y divide-zinc-100">
+        <div class="flex justify-between px-4 py-2.5 text-sm">
+          <span class="text-zinc-500">Expert skills</span>
+          <span class="font-medium text-zinc-800">${profile.skills_expert.length}</span>
+        </div>
+        <div class="flex justify-between px-4 py-2.5 text-sm">
+          <span class="text-zinc-500">Proficient skills</span>
+          <span class="font-medium text-zinc-800">${profile.skills_proficient.length}</span>
+        </div>
+        <div class="flex justify-between px-4 py-2.5 text-sm">
+          <span class="text-zinc-500">Familiar skills</span>
+          <span class="font-medium text-zinc-800">${profile.skills_familiar.length}</span>
+        </div>
+        <div class="flex justify-between px-4 py-2.5 text-sm">
+          <span class="text-zinc-500">Experience</span>
+          <span class="font-medium text-zinc-800">${profile.experience_years} years</span>
+        </div>
+        <div class="flex justify-between px-4 py-2.5 text-sm">
+          <span class="text-zinc-500">Prompt templates</span>
+          <span class="font-medium text-zinc-800">${Object.values(prompts).filter(p => p.length > 0).length}/3</span>
+        </div>
       </div>
     `;
 
@@ -103,30 +102,30 @@ async function handleFile(file: File) {
 
 function renderCurrentProfile(profile: ParsedProfile) {
   currentProfile.innerHTML = `
-    <div class="profile-summary">
-      <div class="stat">
-        <span class="stat-label">Expert skills</span>
-        <span class="stat-value">${profile.skills_expert.length} (${profile.skills_expert.slice(0, 5).join(', ')}${profile.skills_expert.length > 5 ? '...' : ''})</span>
+    <div class="rounded-lg bg-zinc-50 border border-zinc-200 divide-y divide-zinc-100">
+      <div class="flex justify-between px-4 py-2.5 text-sm">
+        <span class="text-zinc-500">Expert skills</span>
+        <span class="font-medium text-zinc-800">${profile.skills_expert.length} <span class="text-zinc-400 font-normal">(${profile.skills_expert.slice(0, 5).join(', ')}${profile.skills_expert.length > 5 ? '...' : ''})</span></span>
       </div>
-      <div class="stat">
-        <span class="stat-label">Proficient skills</span>
-        <span class="stat-value">${profile.skills_proficient.length}</span>
+      <div class="flex justify-between px-4 py-2.5 text-sm">
+        <span class="text-zinc-500">Proficient skills</span>
+        <span class="font-medium text-zinc-800">${profile.skills_proficient.length}</span>
       </div>
-      <div class="stat">
-        <span class="stat-label">Familiar skills</span>
-        <span class="stat-value">${profile.skills_familiar.length}</span>
+      <div class="flex justify-between px-4 py-2.5 text-sm">
+        <span class="text-zinc-500">Familiar skills</span>
+        <span class="font-medium text-zinc-800">${profile.skills_familiar.length}</span>
       </div>
-      <div class="stat">
-        <span class="stat-label">Experience</span>
-        <span class="stat-value">${profile.experience_years} years</span>
+      <div class="flex justify-between px-4 py-2.5 text-sm">
+        <span class="text-zinc-500">Experience</span>
+        <span class="font-medium text-zinc-800">${profile.experience_years} years</span>
       </div>
-      <div class="stat">
-        <span class="stat-label">Titles held</span>
-        <span class="stat-value">${profile.titles_held.join(', ') || 'None'}</span>
+      <div class="flex justify-between px-4 py-2.5 text-sm">
+        <span class="text-zinc-500">Titles</span>
+        <span class="font-medium text-zinc-800">${profile.titles_held.join(', ') || 'None'}</span>
       </div>
     </div>
   `;
-  profileActions.style.display = 'flex';
+  profileActions.classList.remove('hidden');
 }
 
 clearProfileBtn.addEventListener('click', async () => {
@@ -134,17 +133,19 @@ clearProfileBtn.addEventListener('click', async () => {
     profile: null,
     prompts: { gen_ai: '', mle: '', mix: '' },
   });
-  currentProfile.innerHTML = '<p style="font-size: 14px; color: #9ca3af;">No profile loaded.</p>';
-  profileActions.style.display = 'none';
-  profileSummary.style.display = 'none';
+  currentProfile.innerHTML = '<p class="text-sm text-zinc-400">No profile loaded.</p>';
+  profileActions.classList.add('hidden');
+  profileSummary.classList.add('hidden');
   showStatus(importStatus, 'Profile cleared.', 'success');
   await loadPrompts();
 });
 
 function showStatus(el: HTMLElement, message: string, type: 'success' | 'error') {
   el.textContent = message;
-  el.className = `status status-${type}`;
-  setTimeout(() => { el.className = 'status'; }, 4000);
+  el.className = type === 'success'
+    ? 'mt-3 text-sm rounded-lg px-3 py-2 bg-emerald-50 text-emerald-700 border border-emerald-200'
+    : 'mt-3 text-sm rounded-lg px-3 py-2 bg-red-50 text-red-700 border border-red-200';
+  setTimeout(() => { el.className = 'mt-3 text-sm rounded-lg px-3 py-2 hidden'; }, 4000);
 }
 
 // ─── Prompt management ────────────────────────────────────────────────
@@ -183,29 +184,58 @@ function renderPromptCards() {
     const isEmpty = !displayValue;
 
     const card = document.createElement('div');
-    card.className = 'prompt-card';
+    card.className = 'rounded-lg border border-zinc-200 bg-zinc-50/50 overflow-hidden';
     card.dataset.key = meta.key;
 
+    const categoryClass = meta.category === 'system'
+      ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+      : 'bg-violet-50 text-violet-700 border-violet-200';
+
     card.innerHTML = `
-      <div class="prompt-header">
-        <div>
-          <span class="prompt-title">${meta.title}</span>
-          ${isModified ? '<span class="prompt-modified-badge">Modified</span>' : ''}
-          <span class="prompt-category prompt-category-${meta.category}">${meta.category}</span>
+      <div class="flex items-center justify-between px-4 py-3 cursor-pointer select-none" data-toggle>
+        <div class="flex items-center gap-2.5">
+          <svg class="w-3.5 h-3.5 text-zinc-400 transition-transform duration-200" data-chevron fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" d="m8.25 4.5 7.5 7.5-7.5 7.5" />
+          </svg>
+          <span class="text-sm font-medium text-zinc-800">${meta.title}</span>
+          ${isModified ? '<span class="text-[10px] font-medium px-1.5 py-0.5 rounded bg-amber-50 text-amber-700 border border-amber-200">Modified</span>' : ''}
+          <span class="text-[10px] font-medium px-1.5 py-0.5 rounded border ${categoryClass}">${meta.category}</span>
         </div>
-        <div class="prompt-actions" data-mode="view">
-          <button class="btn btn-secondary prompt-edit-btn">Edit</button>
+        <button class="text-xs font-medium text-zinc-400 hover:text-zinc-700 transition-colors px-2 py-1 cursor-pointer" data-edit-btn>Edit</button>
+      </div>
+      <div class="hidden" data-body>
+        <div class="px-4 pb-4">
+          <p class="text-xs text-zinc-400 mb-3">${meta.description}</p>
+          ${isEmpty
+            ? '<p class="text-xs italic text-zinc-400 py-4 text-center">No template loaded. Import a profile to populate.</p>'
+            : `<div class="rounded-lg overflow-hidden border border-zinc-800">
+                <textarea readonly class="editor-textarea w-full px-4 py-3 text-xs font-mono leading-relaxed bg-zinc-900 text-zinc-300 focus:outline-none">${escapeHtml(displayValue)}</textarea>
+              </div>`
+          }
         </div>
       </div>
-      <p class="prompt-description">${meta.description}</p>
-      ${isEmpty
-        ? '<p class="prompt-empty">No template loaded. Import a profile to populate Claude templates.</p>'
-        : `<textarea class="prompt-textarea" readonly>${escapeHtml(displayValue)}</textarea>`
-      }
     `;
 
-    const editBtn = card.querySelector('.prompt-edit-btn') as HTMLButtonElement;
-    editBtn.addEventListener('click', () => enterEditMode(card, meta));
+    // Toggle expand/collapse
+    const toggleEl = card.querySelector('[data-toggle]')!;
+    const bodyEl = card.querySelector('[data-body]')!;
+    const chevron = card.querySelector('[data-chevron]') as HTMLElement;
+    const editBtn = card.querySelector('[data-edit-btn]') as HTMLButtonElement;
+
+    toggleEl.addEventListener('click', (e) => {
+      if ((e.target as HTMLElement).closest('[data-edit-btn]')) return;
+      bodyEl.classList.toggle('hidden');
+      chevron.style.transform = bodyEl.classList.contains('hidden') ? '' : 'rotate(90deg)';
+    });
+
+    editBtn.addEventListener('click', () => {
+      // Expand if collapsed
+      if (bodyEl.classList.contains('hidden')) {
+        bodyEl.classList.remove('hidden');
+        chevron.style.transform = 'rotate(90deg)';
+      }
+      enterEditMode(card, meta);
+    });
 
     promptsList.appendChild(card);
   }
@@ -214,55 +244,71 @@ function renderPromptCards() {
 function enterEditMode(card: HTMLElement, meta: typeof PROMPT_REGISTRY[number]) {
   const saved = promptValues[meta.key];
   const displayValue = saved || meta.defaultValue;
+  const bodyEl = card.querySelector('[data-body]')!;
 
-  // Replace card content with edit mode
-  const actionsDiv = card.querySelector('.prompt-actions') as HTMLElement;
-  actionsDiv.dataset.mode = 'edit';
-  actionsDiv.innerHTML = `
-    <button class="btn btn-primary prompt-save-btn">Save</button>
-    <button class="btn btn-secondary prompt-cancel-btn">Cancel</button>
-    ${meta.category === 'system'
-      ? '<button class="btn btn-danger prompt-reset-btn">Reset to Default</button>'
-      : '<button class="btn btn-danger prompt-clear-btn">Clear</button>'
-    }
+  const resetOrClear = meta.category === 'system'
+    ? '<button class="text-xs font-medium text-red-400 hover:text-red-500 transition-colors cursor-pointer" data-reset-btn>Reset to Default</button>'
+    : '<button class="text-xs font-medium text-red-400 hover:text-red-500 transition-colors cursor-pointer" data-clear-btn>Clear</button>';
+
+  bodyEl.innerHTML = `
+    <div class="px-4 pb-4">
+      <p class="text-xs text-zinc-400 mb-3">${meta.description}</p>
+      ${meta.variables && meta.variables.length > 0 ? `
+        <div class="flex flex-wrap gap-1.5 mb-3" data-vars>
+          ${meta.variables.map(v => `<button class="text-[10px] font-mono px-2 py-1 rounded bg-zinc-100 text-zinc-500 border border-zinc-200 hover:bg-zinc-200 hover:text-zinc-700 transition-colors cursor-pointer" data-var="{{${v}}}">{{${v}}}</button>`).join('')}
+        </div>
+      ` : ''}
+      <div class="rounded-lg overflow-hidden border border-zinc-700 focus-within:border-indigo-500 focus-within:ring-1 focus-within:ring-indigo-500/30 transition-all">
+        <textarea class="editor-textarea w-full px-4 py-3 text-xs font-mono leading-relaxed bg-zinc-900 text-zinc-100 focus:outline-none placeholder:text-zinc-600" data-editor>${escapeHtml(displayValue)}</textarea>
+      </div>
+      <div class="flex items-center justify-between mt-3">
+        <div class="flex gap-2">
+          <button class="text-xs font-medium px-3 py-1.5 rounded-md bg-zinc-900 text-white hover:bg-zinc-800 transition-colors cursor-pointer" data-save-btn>Save</button>
+          <button class="text-xs font-medium px-3 py-1.5 rounded-md bg-zinc-100 text-zinc-600 hover:bg-zinc-200 transition-colors cursor-pointer" data-cancel-btn>Cancel</button>
+        </div>
+        ${resetOrClear}
+      </div>
+    </div>
   `;
 
-  // Ensure there's a textarea (may not exist if empty)
-  let textarea = card.querySelector('.prompt-textarea') as HTMLTextAreaElement | null;
-  const emptyMsg = card.querySelector('.prompt-empty');
-  if (!textarea) {
-    textarea = document.createElement('textarea');
-    textarea.className = 'prompt-textarea';
-    if (emptyMsg) emptyMsg.replaceWith(textarea);
-    else card.querySelector('.prompt-description')!.insertAdjacentElement('afterend', textarea);
-  }
+  const editor = bodyEl.querySelector('[data-editor]') as HTMLTextAreaElement;
 
-  textarea.readOnly = false;
-  textarea.value = displayValue;
-
-  // Show variables hint for system prompts
-  if (meta.variables && meta.variables.length > 0) {
-    let varsHint = card.querySelector('.prompt-vars');
-    if (!varsHint) {
-      varsHint = document.createElement('p');
-      varsHint.className = 'prompt-vars';
-      textarea.insertAdjacentElement('afterend', varsHint);
+  // Tab key inserts tab instead of moving focus
+  editor.addEventListener('keydown', (e) => {
+    if (e.key === 'Tab') {
+      e.preventDefault();
+      const start = editor.selectionStart;
+      const end = editor.selectionEnd;
+      editor.value = editor.value.substring(0, start) + '  ' + editor.value.substring(end);
+      editor.selectionStart = editor.selectionEnd = start + 2;
     }
-    varsHint.innerHTML = `Available: ${meta.variables.map(v => `<code>{{${v}}}</code>`).join(' ')}`;
-  }
+  });
+
+  // Variable chip insertion
+  bodyEl.querySelectorAll('[data-var]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const varText = (btn as HTMLElement).dataset.var!;
+      const start = editor.selectionStart;
+      editor.value = editor.value.substring(0, start) + varText + editor.value.substring(editor.selectionEnd);
+      editor.selectionStart = editor.selectionEnd = start + varText.length;
+      editor.focus();
+    });
+  });
 
   // Wire buttons
-  card.querySelector('.prompt-save-btn')!.addEventListener('click', () => savePrompt(card, meta, textarea!));
-  card.querySelector('.prompt-cancel-btn')!.addEventListener('click', () => loadPrompts());
+  bodyEl.querySelector('[data-save-btn]')!.addEventListener('click', () => savePrompt(meta, editor));
+  bodyEl.querySelector('[data-cancel-btn]')!.addEventListener('click', () => loadPrompts());
 
-  const resetBtn = card.querySelector('.prompt-reset-btn');
+  const resetBtn = bodyEl.querySelector('[data-reset-btn]');
   if (resetBtn) resetBtn.addEventListener('click', () => resetPrompt(meta));
 
-  const clearBtn = card.querySelector('.prompt-clear-btn');
+  const clearBtn = bodyEl.querySelector('[data-clear-btn]');
   if (clearBtn) clearBtn.addEventListener('click', () => clearClaudePrompt(meta));
+
+  editor.focus();
 }
 
-async function savePrompt(card: HTMLElement, meta: typeof PROMPT_REGISTRY[number], textarea: HTMLTextAreaElement) {
+async function savePrompt(meta: typeof PROMPT_REGISTRY[number], textarea: HTMLTextAreaElement) {
   const value = textarea.value;
 
   if (meta.category === 'system') {
@@ -335,53 +381,35 @@ function initPdfGenerator() {
     .then(r => r.ok ? r.json() : Promise.reject(new Error(`GitHub API: ${r.status}`)))
     .then((release: any) => {
       const tag = release.tag_name;
-      statusDiv.innerHTML = `<span style="font-size: 12px; color: #166534; background: #f0fdf4; padding: 4px 10px; border-radius: 4px; border: 1px solid #bbf7d0;">Latest: ${tag}</span>`;
+      statusDiv.innerHTML = `<span class="text-xs font-medium px-2 py-1 rounded bg-emerald-50 text-emerald-700 border border-emerald-200">${tag}</span>`;
 
       for (const asset of assets) {
         const ghAsset = release.assets?.find((a: any) => a.name === asset.file);
         const url = ghAsset?.browser_download_url
           || `https://github.com/${GITHUB_REPO}/releases/latest/download/${asset.file}`;
         const isRecommended = asset.os === detectedOs;
-
-        const btn = document.createElement('a');
-        btn.href = url;
-        btn.className = 'btn btn-primary';
-        btn.target = '_blank';
-        btn.style.textDecoration = 'none';
-        btn.style.fontSize = '12px';
-        if (isRecommended) {
-          btn.style.background = '#166534';
-          btn.textContent = `${asset.label} (Recommended)`;
-        } else {
-          btn.style.background = '#52525b';
-          btn.textContent = asset.label;
-        }
-        downloadDiv.appendChild(btn);
+        renderDownloadBtn(downloadDiv, url, asset.label, isRecommended);
       }
     })
     .catch(() => {
-      // Fallback: direct links without version check
-      statusDiv.innerHTML = '<span style="font-size: 12px; color: #71717a;">Could not check for latest version.</span>';
+      statusDiv.innerHTML = '<span class="text-xs text-zinc-400">Could not check for latest version.</span>';
       for (const asset of assets) {
         const url = `https://github.com/${GITHUB_REPO}/releases/latest/download/${asset.file}`;
         const isRecommended = asset.os === detectedOs;
-
-        const btn = document.createElement('a');
-        btn.href = url;
-        btn.className = 'btn btn-primary';
-        btn.target = '_blank';
-        btn.style.textDecoration = 'none';
-        btn.style.fontSize = '12px';
-        if (isRecommended) {
-          btn.style.background = '#166534';
-          btn.textContent = `${asset.label} (Recommended)`;
-        } else {
-          btn.style.background = '#52525b';
-          btn.textContent = asset.label;
-        }
-        downloadDiv.appendChild(btn);
+        renderDownloadBtn(downloadDiv, url, asset.label, isRecommended);
       }
     });
+}
+
+function renderDownloadBtn(container: HTMLElement, url: string, label: string, recommended: boolean) {
+  const btn = document.createElement('a');
+  btn.href = url;
+  btn.target = '_blank';
+  btn.className = recommended
+    ? 'text-xs font-medium px-3 py-2 rounded-lg no-underline bg-zinc-900 text-white hover:bg-zinc-800 transition-colors'
+    : 'text-xs font-medium px-3 py-2 rounded-lg no-underline bg-zinc-100 text-zinc-600 hover:bg-zinc-200 transition-colors border border-zinc-200';
+  btn.textContent = recommended ? `${label} (Recommended)` : label;
+  container.appendChild(btn);
 }
 
 // ─── Init ─────────────────────────────────────────────────────────────

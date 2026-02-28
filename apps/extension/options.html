@@ -4,391 +4,99 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>The Seer - Settings</title>
+  <link rel="stylesheet" href="dist/tailwind.css">
   <style>
-    * { margin: 0; padding: 0; box-sizing: border-box; }
-
-    body {
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-      background: #f8f9fa;
-      color: #18181b;
-      padding: 0;
-    }
-
-    .container {
-      max-width: 640px;
-      margin: 0 auto;
-      padding: 32px 24px;
-    }
-
-    .header {
-      text-align: center;
-      margin-bottom: 32px;
-    }
-
-    .header h1 {
-      font-size: 24px;
-      font-weight: 700;
-      color: #18181b;
-      margin-bottom: 4px;
-    }
-
-    .header p { color: #71717a; font-size: 14px; }
-
-    .card {
-      background: white;
-      border-radius: 10px;
-      padding: 24px;
-      margin-bottom: 16px;
-      border: 1px solid #e4e4e7;
-    }
-
-    .card h2 {
-      font-size: 15px;
-      font-weight: 600;
-      margin-bottom: 16px;
-      padding-bottom: 12px;
-      border-bottom: 1px solid #f4f4f5;
-      color: #27272a;
-    }
-
-    .field {
-      margin-bottom: 16px;
-    }
-
-    .field label {
-      display: block;
-      font-size: 13px;
-      font-weight: 600;
-      color: #3f3f46;
-      margin-bottom: 6px;
-    }
-
-    .field input[type="text"],
-    .field input[type="password"] {
-      width: 100%;
-      padding: 10px 12px;
-      border: 1px solid #d4d4d8;
-      border-radius: 8px;
-      font-size: 14px;
-      font-family: monospace;
-      transition: border-color 0.15s, box-shadow 0.15s;
-      background: #fafafa;
-    }
-
-    .field input:focus {
-      outline: none;
-      border-color: #3f3f46;
-      box-shadow: 0 0 0 2px rgba(63, 63, 70, 0.08);
-      background: #fff;
-    }
-
-    .field .hint {
-      font-size: 12px;
-      color: #a1a1aa;
-      margin-top: 4px;
-    }
-
-    .field .hint a {
-      color: #52525b;
-      text-decoration: underline;
-    }
-
-    .file-upload {
-      border: 2px dashed #d4d4d8;
-      border-radius: 8px;
-      padding: 24px;
-      text-align: center;
-      cursor: pointer;
-      transition: border-color 0.15s, background 0.15s;
-    }
-
-    .file-upload:hover {
-      border-color: #a1a1aa;
-      background: #fafafa;
-    }
-
-    .file-upload p {
-      font-size: 14px;
-      color: #71717a;
-      margin-bottom: 8px;
-    }
-
-    .file-upload .browse {
-      color: #18181b;
-      font-weight: 600;
-      cursor: pointer;
-      text-decoration: underline;
-    }
-
-    .btn {
-      padding: 10px 20px;
-      border: none;
-      border-radius: 8px;
-      font-size: 13px;
-      font-weight: 600;
-      cursor: pointer;
-      transition: background 0.15s;
-    }
-
-    .btn-primary {
-      background: #1a1a2e;
-      color: white;
-    }
-
-    .btn-primary:hover { background: #2a2a42; }
-
-    .btn-danger {
-      background: #fef2f2;
-      color: #dc2626;
-      border: 1px solid #fecaca;
-    }
-
-    .btn-danger:hover { background: #fee2e2; }
-
-    .status {
-      margin-top: 12px;
-      padding: 8px 12px;
-      border-radius: 6px;
-      font-size: 13px;
-      display: none;
-    }
-
-    .status-success {
-      background: #f0fdf4;
-      color: #166534;
-      border: 1px solid #bbf7d0;
-      display: block;
-    }
-
-    .status-error {
-      background: #fef2f2;
-      color: #991b1b;
-      border: 1px solid #fecaca;
-      display: block;
-    }
-
-    .profile-summary {
-      background: #fafafa;
-      border-radius: 8px;
-      padding: 16px;
-      margin-top: 12px;
-      border: 1px solid #e4e4e7;
-    }
-
-    .profile-summary .stat {
-      display: flex;
-      justify-content: space-between;
-      padding: 4px 0;
-      font-size: 13px;
-    }
-
-    .profile-summary .stat-label { color: #71717a; }
-    .profile-summary .stat-value { font-weight: 600; color: #27272a; }
-
-    .actions {
-      display: flex;
-      gap: 12px;
-      margin-top: 16px;
-    }
-
-    /* ─── Prompt management ──────────────────────────── */
-    .prompts-section h2 {
-      font-size: 15px;
-      font-weight: 600;
-      margin-bottom: 16px;
-      padding-bottom: 12px;
-      border-bottom: 1px solid #f4f4f5;
-      color: #27272a;
-    }
-
-    .prompt-card {
-      background: #fafafa;
-      border: 1px solid #e4e4e7;
-      border-radius: 8px;
-      padding: 16px;
-      margin-bottom: 12px;
-    }
-
-    .prompt-header {
-      display: flex;
-      justify-content: space-between;
-      align-items: flex-start;
-      margin-bottom: 8px;
-    }
-
-    .prompt-title {
-      font-size: 13px;
-      font-weight: 600;
-      color: #27272a;
-    }
-
-    .prompt-category {
-      font-size: 11px;
-      font-weight: 500;
-      padding: 2px 8px;
-      border-radius: 4px;
-      text-transform: uppercase;
-      letter-spacing: 0.04em;
-    }
-
-    .prompt-category-system {
-      background: #f0fdf4;
-      color: #166534;
-    }
-
-    .prompt-category-claude {
-      background: #faf5ff;
-      color: #7c3aed;
-    }
-
-    .prompt-description {
-      font-size: 12px;
-      color: #71717a;
-      margin-bottom: 10px;
-    }
-
-    .prompt-textarea {
-      width: 100%;
-      min-height: 96px;
-      padding: 10px 12px;
-      border: 1px solid #d4d4d8;
-      border-radius: 6px;
-      font-size: 12px;
-      font-family: 'SF Mono', 'Fira Code', monospace;
-      line-height: 1.5;
+    /* Editor textarea — Tailwind can't express these resize/scrollbar tweaks */
+    .editor-textarea {
+      tab-size: 2;
       resize: vertical;
-      background: #fff;
-      color: #27272a;
-      transition: border-color 0.15s;
+      field-sizing: content;
+      min-height: 80px;
+      max-height: 420px;
     }
-
-    .prompt-textarea:read-only {
-      background: #f4f4f5;
-      color: #52525b;
-      cursor: default;
+    .editor-textarea:read-only {
       max-height: 96px;
       overflow: hidden;
+      resize: none;
     }
-
-    .prompt-textarea:not(:read-only) {
-      min-height: 240px;
-      max-height: none;
+    .editor-textarea:not(:read-only) {
+      min-height: 260px;
     }
-
-    .prompt-textarea:focus {
-      outline: none;
-      border-color: #3f3f46;
-      box-shadow: 0 0 0 2px rgba(63, 63, 70, 0.08);
-    }
-
-    .prompt-actions {
-      display: flex;
-      gap: 8px;
-      margin-top: 10px;
-    }
-
-    .prompt-actions .btn {
-      padding: 6px 14px;
-      font-size: 12px;
-    }
-
-    .btn-secondary {
-      background: #f4f4f5;
-      color: #3f3f46;
-      border: 1px solid #d4d4d8;
-    }
-
-    .btn-secondary:hover { background: #e4e4e7; }
-
-    .prompt-vars {
-      font-size: 11px;
-      color: #a1a1aa;
-      margin-top: 8px;
-      line-height: 1.6;
-    }
-
-    .prompt-vars code {
-      background: #f4f4f5;
-      padding: 1px 5px;
-      border-radius: 3px;
-      font-size: 10px;
-    }
-
-    .prompt-empty {
-      font-size: 12px;
-      font-style: italic;
-      color: #a1a1aa;
-      padding: 12px;
-      text-align: center;
-    }
-
-    .prompt-modified-badge {
-      font-size: 10px;
-      font-weight: 500;
-      padding: 1px 6px;
-      border-radius: 3px;
-      background: #fef3c7;
-      color: #92400e;
-      margin-left: 8px;
-    }
+    .editor-textarea::-webkit-scrollbar { width: 6px; }
+    .editor-textarea::-webkit-scrollbar-track { background: transparent; }
+    .editor-textarea::-webkit-scrollbar-thumb { background: #3f3f46; border-radius: 3px; }
   </style>
 </head>
-<body>
-  <div class="container">
-    <div class="header">
-      <h1>The Seer</h1>
-      <p>Configure your resume fit checker</p>
-    </div>
+<body class="bg-zinc-50 text-zinc-900 antialiased">
+  <div class="max-w-2xl mx-auto px-6 py-10">
 
-    <div class="card">
-      <h2>Profile Import</h2>
-      <p style="font-size: 13px; color: #71717a; margin-bottom: 16px;">
-        Import your profile from the CLI: run <code>pnpm seer export</code> to generate the JSON file.
-      </p>
-
-      <div class="file-upload" id="file-drop">
-        <p>Drop your <strong>seer-profile-export.json</strong> here</p>
-        <p>or <span class="browse" id="browse-btn">browse</span></p>
-        <input type="file" id="file-input" accept=".json" style="display: none;">
+    <!-- Header -->
+    <header class="mb-10">
+      <div class="flex items-center gap-3 mb-1">
+        <div class="w-8 h-8 rounded-lg bg-zinc-900 text-zinc-100 flex items-center justify-center text-sm font-bold">S</div>
+        <h1 class="text-xl font-semibold tracking-tight">Settings</h1>
       </div>
+      <p class="text-sm text-zinc-400 ml-11">Configure The Seer</p>
+    </header>
 
-      <div class="status" id="import-status"></div>
-      <div class="profile-summary" id="profile-summary" style="display: none;"></div>
-    </div>
+    <!-- Profile section -->
+    <section class="mb-6">
+      <div class="rounded-xl bg-white border border-zinc-200 shadow-sm overflow-hidden">
+        <div class="px-6 py-5">
+          <h2 class="text-sm font-semibold text-zinc-800 mb-1">Profile</h2>
+          <p class="text-xs text-zinc-400 mb-5">Import from CLI: <code class="text-xs bg-zinc-100 px-1.5 py-0.5 rounded">pnpm seer export</code></p>
 
-    <div class="card">
-      <h2>Current Profile</h2>
-      <div id="current-profile">
-        <p style="font-size: 14px; color: #a1a1aa;">No profile loaded.</p>
-      </div>
-      <div class="actions" id="profile-actions" style="display: none;">
-        <button class="btn btn-danger" id="clear-profile">Clear Profile</button>
-      </div>
-    </div>
+          <div id="current-profile">
+            <p class="text-sm text-zinc-400">No profile loaded.</p>
+          </div>
+          <div id="profile-actions" class="mt-4 hidden">
+            <button class="text-xs font-medium text-red-500 hover:text-red-600 transition-colors cursor-pointer" id="clear-profile">Clear Profile</button>
+          </div>
+        </div>
 
-    <div class="card">
-      <h2>PDF Generator</h2>
-      <p style="font-size: 13px; color: #71717a; margin-bottom: 16px;">
-        The Seer generates tailored resume PDFs locally on your machine. Download and run the one-click installer for your platform.
-      </p>
-      <div id="pdf-gen-status" style="margin-bottom: 12px;"></div>
-      <div id="pdf-gen-download" style="display: flex; gap: 12px; flex-wrap: wrap;"></div>
-      <div style="margin-top: 16px;">
-        <div class="field">
-          <label for="ext-id-display">Your Extension ID</label>
-          <input type="text" id="ext-id-display" readonly style="background: #f4f4f5; cursor: default;">
-          <p class="hint">Pass this to the installer: <code>./install.sh &lt;extension-id&gt;</code></p>
+        <div class="border-t border-zinc-100 px-6 py-5">
+          <div id="file-drop" class="border-2 border-dashed border-zinc-200 rounded-lg p-8 text-center cursor-pointer transition-all hover:border-zinc-400 hover:bg-zinc-50">
+            <p class="text-sm text-zinc-500 mb-1">Drop <span class="font-medium text-zinc-700">seer-profile-export.json</span> here</p>
+            <p class="text-xs text-zinc-400">or <span class="font-medium text-zinc-600 underline cursor-pointer" id="browse-btn">browse</span></p>
+            <input type="file" id="file-input" accept=".json" class="hidden">
+          </div>
+          <div id="import-status" class="mt-3 text-sm rounded-lg px-3 py-2 hidden"></div>
+          <div id="profile-summary" class="hidden"></div>
         </div>
       </div>
-    </div>
+    </section>
 
-    <div class="card prompts-section">
-      <h2>Prompt Templates</h2>
-      <p style="font-size: 13px; color: #71717a; margin-bottom: 16px;">
-        Customize the prompts sent to each LLM. System prompts use <code>{{variable}}</code> placeholders that are filled at runtime.
-      </p>
-      <div id="prompts-list"></div>
-    </div>
+    <!-- PDF Generator -->
+    <section class="mb-6">
+      <div class="rounded-xl bg-white border border-zinc-200 shadow-sm px-6 py-5">
+        <h2 class="text-sm font-semibold text-zinc-800 mb-1">PDF Generator</h2>
+        <p class="text-xs text-zinc-400 mb-4">Generates tailored resume PDFs locally. Download the installer for your platform.</p>
+
+        <div id="pdf-gen-status" class="mb-3"></div>
+        <div id="pdf-gen-download" class="flex gap-2 flex-wrap"></div>
+
+        <div class="mt-5 pt-4 border-t border-zinc-100">
+          <label class="block text-xs font-medium text-zinc-500 mb-1.5" for="ext-id-display">Extension ID</label>
+          <input type="text" id="ext-id-display" readonly
+            class="w-full px-3 py-2 text-sm font-mono bg-zinc-50 border border-zinc-200 rounded-lg text-zinc-600 cursor-default focus:outline-none">
+          <p class="text-xs text-zinc-400 mt-1.5">Pass to installer: <code class="text-xs bg-zinc-100 px-1 py-0.5 rounded">./install.sh &lt;extension-id&gt;</code></p>
+        </div>
+      </div>
+    </section>
+
+    <!-- Prompt Templates -->
+    <section class="mb-6">
+      <div class="rounded-xl bg-white border border-zinc-200 shadow-sm overflow-hidden">
+        <div class="px-6 py-5">
+          <div class="flex items-center justify-between mb-1">
+            <h2 class="text-sm font-semibold text-zinc-800">Prompt Templates</h2>
+          </div>
+          <p class="text-xs text-zinc-400 mb-5">Customize the prompts sent to each LLM. System prompts use <code class="text-xs bg-zinc-100 px-1 py-0.5 rounded">{{variable}}</code> placeholders.</p>
+          <div id="prompts-list" class="space-y-3"></div>
+        </div>
+      </div>
+    </section>
+
   </div>
 
   <script type="module" src="dist/options.js"></script>

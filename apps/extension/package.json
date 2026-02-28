@@ -8,8 +8,10 @@
     "dev": "node build.mjs --watch"
   },
   "devDependencies": {
+    "@tailwindcss/cli": "^4.2.1",
     "@types/chrome": "^0.1.36",
     "esbuild": "^0.24.0",
+    "tailwindcss": "^4.2.1",
     "typescript": "^5.7.0"
   }
 }

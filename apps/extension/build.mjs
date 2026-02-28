@@ -1,7 +1,16 @@
 import * as esbuild from 'esbuild';
+import { execSync } from 'node:child_process';
 
 const isWatch = process.argv.includes('--watch');
 
+// ── Tailwind CSS ──────────────────────────────────────────────────────
+const twFlags = isWatch ? '' : '--minify';
+execSync(
+  `npx @tailwindcss/cli -i src/styles/input.css -o dist/tailwind.css ${twFlags}`,
+  { stdio: 'inherit' },
+);
+
+// ── esbuild ───────────────────────────────────────────────────────────
 const commonOptions = {
   bundle: true,
   sourcemap: true,
