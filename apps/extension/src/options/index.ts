@@ -1,5 +1,6 @@
 import { getSettings, saveSettings, getSystemPrompts, saveSystemPrompt, deleteSystemPrompt } from '../shared/storage.js';
 import { PROMPT_REGISTRY, getDefaultPrompt } from '../shared/prompt-defaults.js';
+import { syncPrompt } from '../shared/tracker.js';
 import type { ParsedProfile, BaseResumeSlug } from '../shared/types.js';
 
 const fileDrop = document.getElementById('file-drop')!;
@@ -172,6 +173,38 @@ async function loadPrompts() {
   }
 
   renderPromptCards();
+
+  // Sync any prompts that don't have a dashboard ID yet
+  syncExistingPrompts(settings);
+}
+
+/** Fire-and-forget: sync all prompts missing a dashboard _id. */
+async function syncExistingPrompts(settings: import('../shared/types.js').SeerSettings) {
+  const ids = { ...settings.promptIds };
+  let changed = false;
+
+  for (const meta of PROMPT_REGISTRY) {
+    if (ids[meta.key]) continue; // already synced
+
+    const content = promptValues[meta.key] || meta.defaultValue;
+    if (!content) continue;
+
+    const result = await syncPrompt({
+      key: meta.key,
+      content,
+      category: meta.category,
+      title: meta.title,
+    });
+
+    if (result) {
+      ids[meta.key] = result._id;
+      changed = true;
+    }
+  }
+
+  if (changed) {
+    await saveSettings({ promptIds: ids });
+  }
 }
 
 function renderPromptCards() {
@@ -343,6 +376,23 @@ async function savePromptFromModal(meta: typeof PROMPT_REGISTRY[number]) {
     settings.prompts[slug] = value;
     await saveSettings({ prompts: settings.prompts });
     promptValues[meta.key] = value;
+  }
+
+  // Sync prompt to dashboard (fire-and-forget)
+  const contentToSync = value || meta.defaultValue;
+  if (contentToSync) {
+    syncPrompt({
+      key: meta.key,
+      content: contentToSync,
+      category: meta.category,
+      title: meta.title,
+    }).then(async (result) => {
+      if (result) {
+        const settings = await getSettings();
+        settings.promptIds[meta.key] = result._id;
+        await saveSettings({ promptIds: settings.promptIds });
+      }
+    });
   }
 
   renderPromptCards();

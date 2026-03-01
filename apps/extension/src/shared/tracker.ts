@@ -37,11 +37,52 @@ async function apiCall(
 // ─── Public API ───────────────────────────────────────────────────────
 
 /**
+ * Sync a prompt to the dashboard. Returns the prompt _id and version,
+ * or null if the sync fails.
+ */
+export async function syncPrompt(data: {
+  key: string;
+  content: string;
+  category: string;
+  title: string;
+}): Promise<{ _id: string; version: number } | null> {
+  try {
+    console.log(`${TAG} syncPrompt: ${data.key}`);
+    const result = await apiCall('POST', '/api/prompts', data);
+    console.log(`${TAG} Prompt synced: ${data.key} v${result.version} (${result.existing ? 'existing' : 'new'})`);
+    return { _id: result._id as string, version: result.version as number };
+  } catch (err: any) {
+    console.log(`${TAG} syncPrompt failed: ${err.message}`);
+    return null;
+  }
+}
+
+/**
  * Create a new job record in the dashboard. Returns the MongoDB _id.
  */
 export async function trackJobCreated(data: Record<string, unknown>): Promise<string> {
   try {
     console.log(`${TAG} trackJobCreated: ${data.title} @ ${data.company}`);
+
+    // Attach prompt version IDs if available
+    const settings = await getSettings();
+    if (Object.keys(settings.promptIds).length > 0) {
+      const promptVersions: Record<string, string> = {};
+      if (settings.promptIds.grok_extraction) {
+        promptVersions.grok = settings.promptIds.grok_extraction;
+      }
+      // Find the claude prompt ID based on recommended base
+      const claudeKey = data.recommendedBase
+        ? `claude_${data.recommendedBase}`
+        : null;
+      if (claudeKey && settings.promptIds[claudeKey]) {
+        promptVersions.claude = settings.promptIds[claudeKey];
+      }
+      if (Object.keys(promptVersions).length > 0) {
+        data.promptVersions = promptVersions;
+      }
+    }
+
     const result = await apiCall('POST', '/api/jobs', data);
     console.log(`${TAG} Job created: ${result._id}`);
     return result._id as string;
@@ -77,6 +118,7 @@ export async function trackClaudeData(
     claudeResponse?: string;
     claudeChatUrl?: string;
     claudeResponseMs?: number;
+    claudePromptKey?: string;
   }
 ): Promise<void> {
   if (!jobId) return;
@@ -89,6 +131,16 @@ export async function trackClaudeData(
     if (data.claudeResponseMs !== undefined) {
       body.timing = { claudeResponseMs: data.claudeResponseMs };
     }
+
+    // Attach claude prompt version ID if available
+    if (data.claudePromptKey) {
+      const settings = await getSettings();
+      const claudeId = settings.promptIds[data.claudePromptKey];
+      if (claudeId) {
+        body.promptVersions = { claude: claudeId };
+      }
+    }
+
     await apiCall('PATCH', `/api/jobs/${jobId}`, body);
     console.log(`${TAG} Claude data saved for job ${jobId}`);
   } catch (err: any) {

@@ -71,6 +71,7 @@ export interface SeerSettings {
   claudeExtendedThinking: boolean;
   seerContext: boolean;
   dashboardUrl: string;
+  promptIds: Record<string, string>;
 }
 
 export interface ScrapedJob {

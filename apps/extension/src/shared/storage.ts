@@ -19,6 +19,7 @@ export async function getSettings(): Promise<SeerSettings> {
     'claudeExtendedThinking',
     'seerContext',
     'dashboardUrl',
+    'promptIds',
   ]);
   return {
     profile: data.profile || null,
@@ -29,6 +30,7 @@ export async function getSettings(): Promise<SeerSettings> {
     claudeExtendedThinking: data.claudeExtendedThinking === true, // default off
     seerContext: data.seerContext === true, // default off
     dashboardUrl: (data.dashboardUrl as string) || 'https://the-seer-dashboard.vercel.app',
+    promptIds: (data.promptIds as Record<string, string>) || {},
   };
 }
 
