@@ -7,6 +7,9 @@ import type { ScrapedJob, MessageType } from '../shared/types.js';
 
 const NATIVE_HOST = 'com.theseer.resumegen';
 
+let badgeFlashTimer: ReturnType<typeof setInterval> | null = null;
+let badgeFlashOn = false;
+
 // Handle messages from content script and popup
 chrome.runtime.onMessage.addListener((message: MessageType, sender, sendResponse) => {
   // Grok/Claude automation results are handled by one-time listeners — skip here
@@ -285,6 +288,49 @@ function updateBadge(score: number, pass: boolean, tabId?: number) {
   }
 }
 
+function startBadgeFlash(score: number, pass: boolean) {
+  stopBadgeFlash(); // clear any existing flash
+  badgeFlashOn = true;
+  const scoreColor = pass ? '#10b981' : '#ef4444';
+  const amberColor = '#f59e0b';
+  let showScore = true;
+
+  // Set initial state
+  chrome.action.setBadgeText({ text: `${score}` });
+  chrome.action.setBadgeBackgroundColor({ color: scoreColor });
+
+  badgeFlashTimer = setInterval(() => {
+    showScore = !showScore;
+    if (showScore) {
+      chrome.action.setBadgeText({ text: `${score}` });
+      chrome.action.setBadgeBackgroundColor({ color: scoreColor });
+    } else {
+      chrome.action.setBadgeText({ text: 'PDF' });
+      chrome.action.setBadgeBackgroundColor({ color: amberColor });
+    }
+  }, 500);
+}
+
+function stopBadgeFlash(jdTabId?: number) {
+  if (badgeFlashTimer) {
+    clearInterval(badgeFlashTimer);
+    badgeFlashTimer = null;
+  }
+  badgeFlashOn = false;
+
+  // Clear global badge
+  chrome.action.setBadgeText({ text: '' });
+
+  // Restore per-tab score badge if we have a JD tab
+  if (jdTabId != null) {
+    getJobForTab(jdTabId).then(job => {
+      if (job?.deepAnalysis) {
+        updateBadge(job.deepAnalysis.fit_score, job.deepAnalysis.fit_score >= 40, jdTabId);
+      }
+    }).catch(() => {});
+  }
+}
+
 const CRAWL_SERVER = 'http://localhost:9742';
 
 /**
@@ -429,6 +475,35 @@ async function onClaudeResponseComplete(state: ClaudePollState, hookChatUrl?: st
     console.log(`[Seer BG] Claude response (${responseText.length} chars): ${responseText.slice(0, 200)}...`);
   }
 
+  // Notification: Claude finished, generating resume
+  const notifTitle = (state.jobCompany && state.jobTitle)
+    ? `${state.jobCompany} — ${state.jobTitle}`
+    : state.jobCompany || state.jobTitle || 'The Seer';
+  const stableNotifId = `seer-${state.jdTabId}`;
+  chrome.notifications.create(stableNotifId, {
+    type: 'basic',
+    iconUrl: chrome.runtime.getURL('icons/icon128.png'),
+    title: notifTitle,
+    message: responseText ? 'Generating your tailored resume...' : 'Claude has finished responding',
+    priority: 2,
+  }, (createdId) => {
+    if (chrome.runtime.lastError) {
+      console.error(`[Seer BG] Notification failed: ${chrome.runtime.lastError.message}`);
+    } else {
+      console.log(`[Seer BG] Notification created: ${createdId}`);
+    }
+  });
+
+  // Start badge flash while PDF is generating
+  if (responseText) {
+    const jobData = await getJobForTab(state.jdTabId);
+    console.log(`[Seer BG] Badge flash lookup: jobData=${!!jobData}, deepAnalysis=${!!jobData?.deepAnalysis}, fit_score=${jobData?.deepAnalysis?.fit_score}`);
+    const score = jobData?.deepAnalysis?.fit_score ?? 0;
+    const pass = score >= 40;
+    startBadgeFlash(score, pass);
+    console.log(`[Seer BG] Badge flash started (score: ${score})`);
+  }
+
   // ── Track Claude data in dashboard (fire-and-forget) ──
   const claudeResponseMs = Date.now() - state.startedAt;
   chrome.storage.session.get(`seer_dashboard_job_${state.jdTabId}`).then(data => {
@@ -469,6 +544,7 @@ function triggerPdfGeneration(responseText: string, chatTitle: string, jdTabId: 
     (response) => {
       if (chrome.runtime.lastError) {
         console.log(`[Seer BG] Native messaging error: ${chrome.runtime.lastError.message}`);
+        stopBadgeFlash(jdTabId);
         chrome.tabs.sendMessage(jdTabId, {
           type: 'SEER_PDF_ERROR',
           error: chrome.runtime.lastError.message,
@@ -478,33 +554,13 @@ function triggerPdfGeneration(responseText: string, chatTitle: string, jdTabId: 
 
       if (response?.success) {
         console.log(`[Seer BG] PDF generated: ${response.pdfPath}`);
+
+        // Send PDF ready message + track immediately (no delay)
         chrome.tabs.sendMessage(jdTabId, {
           type: 'SEER_PDF_READY',
           pdfPath: response.pdfPath,
           folderName: response.folderName,
         }).catch(() => {});
-
-        // OS notification — dynamic title based on available job info
-        const notifTitle = (jobCompany && jobTitle) ? `${jobCompany} — ${jobTitle}`
-          : jobCompany ? `${jobCompany} — Resume Ready`
-          : jobTitle ? `${jobTitle} — Resume Ready`
-          : 'The Seer';
-        const notifId = `seer-pdf-${Date.now()}`;
-        chrome.notifications.create(notifId, {
-          type: 'basic',
-          iconUrl: chrome.runtime.getURL('icons/icon128.png'),
-          title: notifTitle,
-          message: 'Your tailored resume is ready — click to open',
-        }, (createdId) => {
-          if (chrome.runtime.lastError) {
-            console.error(`[Seer BG] Notification failed: ${chrome.runtime.lastError.message}`);
-          } else {
-            console.log(`[Seer BG] Notification created: ${createdId}`);
-          }
-        });
-        chrome.storage.session.set({
-          [`seer_notif_${notifId}`]: { pdfPath: response.pdfPath },
-        });
 
         // ── Track resume in dashboard (fire-and-forget) ──
         const pdfMs = Date.now() - pdfStartedAt;
@@ -520,8 +576,34 @@ function triggerPdfGeneration(responseText: string, chatTitle: string, jdTabId: 
             }).catch(() => {});
           }
         }).catch(() => {});
+
+        // Update "generating" notification → "resume ready" (same stable ID)
+        stopBadgeFlash(jdTabId);
+
+        const notifTitle = (jobCompany && jobTitle) ? `${jobCompany} — ${jobTitle}`
+          : jobCompany ? `${jobCompany} — Resume Ready`
+          : jobTitle ? `${jobTitle} — Resume Ready`
+          : 'The Seer';
+        const notifId = `seer-${jdTabId}`;
+        chrome.notifications.create(notifId, {
+          type: 'basic',
+          iconUrl: chrome.runtime.getURL('icons/icon128.png'),
+          title: notifTitle,
+          message: 'Your tailored resume is ready — click to open',
+          priority: 2,
+        }, (createdId) => {
+          if (chrome.runtime.lastError) {
+            console.error(`[Seer BG] Notification failed: ${chrome.runtime.lastError.message}`);
+          } else {
+            console.log(`[Seer BG] PDF notification ready: ${createdId}`);
+          }
+        });
+        chrome.storage.session.set({
+          [`seer_notif_${notifId}`]: { pdfPath: response.pdfPath },
+        });
       } else {
         console.log(`[Seer BG] PDF generation failed: ${response?.error || 'unknown'}`);
+        stopBadgeFlash(jdTabId);
         chrome.tabs.sendMessage(jdTabId, {
           type: 'SEER_PDF_ERROR',
           error: response?.error || 'Unknown error',

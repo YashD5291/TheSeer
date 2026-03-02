@@ -5,12 +5,15 @@
  * code reads it. When the stream ends (or aborts), we extract Claude's
  * text response and signal the ISOLATED world content script.
  *
+ * Note: Claude's "Claude responded" notification uses the Push API
+ * (server-sent, handled in their service worker scope) — cannot be
+ * intercepted from a content script.
+ *
  * Key: instead of response.clone().text() (which dies on AbortController
  * abort), we wrap the ReadableStream body. Chunks are captured as they
  * flow through, so even if the stream is aborted mid-flight, we keep
  * everything received up to that point.
  */
-
 const origFetch = window.fetch;
 
 (window as any).fetch = async function (

@@ -514,8 +514,19 @@ function extractChatTitle(input: string): string | null {
 }
 
 function extractResumeSection(input: string): string {
-  const match = input.match(/## TAILORED RESUME\s*\n([\s\S]*?)(?=\n## CHANGELOG|\n---(?:\s*\n|$))/);
-  if (match) return match[1].trim();
+  // Greedy capture everything after "## TAILORED RESUME", then trim trailing sections
+  const match = input.match(/#{1,6}\s+TAILORED RESUME\s*\n([\s\S]+)/);
+  if (match) {
+    let content = match[1];
+    // Strip leading --- separator (sometimes appears right after the header)
+    content = content.replace(/^-{3,}\s*\n/, '');
+    // Strip trailing CHANGELOG section (with or without --- separator before it)
+    content = content.replace(/\n-{3,}\s*\n#{1,6}\s+CHANGELOG[\s\S]*$/i, '');
+    content = content.replace(/\n#{1,6}\s+CHANGELOG[\s\S]*$/i, '');
+    // Strip trailing --- separator if nothing follows
+    content = content.replace(/\n-{3,}\s*$/, '');
+    return content.trim();
+  }
   const hasResumeMarkers = /^# .+\n/.test(input.trim()) && /## Experience/.test(input);
   if (hasResumeMarkers) return input.trim();
   throw new Error('Could not find "## TAILORED RESUME" section in input.');

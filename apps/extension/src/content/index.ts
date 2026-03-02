@@ -199,7 +199,7 @@ function init() {
     fab.className = 'fab';
     fab.innerHTML = `
       <div class="fab-icon" data-icon>S</div>
-      <div class="fab-tooltip">Analyze with Seer</div>
+      <div class="fab-tooltip">Prophize with Seer</div>
     `;
     shadow.appendChild(fab);
     attachDragHandler(fab);
@@ -576,7 +576,7 @@ function showResultsPanel(data: PanelData) {
     <style>${PANEL_CSS}</style>
     <div class="panel">
       <div class="header">
-        <span class="header-title">As told by The Seer</span>
+        <span class="header-title">The Seer is Prophesying...</span>
         <button class="header-close">&times;</button>
       </div>
       <div class="body">${body}</div>
@@ -1014,7 +1014,7 @@ function showResponseModal(responseText: string, chatUrl?: string) {
     <div class="backdrop">
       <div class="modal">
         <div class="modal-header">
-          <span class="modal-title">Claude's Response</span>
+          <span class="modal-title">The Seer has spoken</span>
           <div class="modal-actions">
             ${chatUrl ? `<a class="modal-btn" href="${chatUrl}" target="_blank" rel="noopener">Open in Claude</a>` : ''}
             <button class="modal-btn" data-copy>Copy Resume</button>
@@ -1088,7 +1088,7 @@ function showToast(message: string, type: 'success' | 'warning' | 'error') {
   const toast = shadow.querySelector('[data-toast]') as HTMLElement;
   toast.textContent = message;
   toast.className = `toast show toast-${type}`;
-  setTimeout(() => { toast.classList.remove('show'); }, 5000);
+  setTimeout(() => { toast.classList.remove('show'); }, 12000);
 }
 
 function esc(s: string): string {
