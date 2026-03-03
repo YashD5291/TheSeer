@@ -25,6 +25,10 @@ You visit a job posting
         |
    PDF compiled locally via LaTeX
         |
+   Click notification to preview PDF
+        |
+   Edit in live LaTeX editor if needed (pencil icon)
+        |
    Everything tracked in your dashboard
 ```
 
@@ -38,6 +42,7 @@ You visit a job posting
 - **Base Resume Selection** — picks the best base template for the role
 - **Tailored Resume** — Claude rewrites your resume for the specific job
 - **PDF Output** — compiled locally, ready to submit
+- **Live LaTeX Editor** — click notification to preview, click pencil to edit bullet points with live recompilation
 
 ---
 
@@ -51,6 +56,7 @@ Chrome Extension (MV3)
     |--- Claude Hook        Intercepts Claude's SSE stream (MAIN world)
     |--- Popup              Model selection, score display, quick controls
     |--- Options            Profile import, prompt templates, PDF generator setup
+    |--- Editor             Live LaTeX editor with PDF preview (CodeMirror 6)
     |
     |--- Grok (browser)     Job analysis via browser automation
     |--- Claude (browser)   Resume generation via browser automation
@@ -61,6 +67,7 @@ Chrome Extension (MV3)
     |           |--- Parses Claude's markdown response
     |           |--- Generates LaTeX from template
     |           |--- Compiles PDF with tectonic
+    |           |--- Recompiles on editor edits (recompile command)
     |           |--- Returns PDF path + base64 to extension
     |
     |--- Dashboard API      Vercel + MongoDB Atlas (fire-and-forget tracking)
@@ -218,7 +225,11 @@ Visit any job posting → click the **S** button (bottom right).
 | Click score in panel | View full analysis |
 | Copy JD | Copies job description to clipboard |
 | Copy Resume | Copies Claude's resume response |
-| View PDF | Opens generated PDF |
+| View PDF | Opens generated PDF in editor page |
+| Click pencil (editor) | Opens split-pane LaTeX editor alongside PDF |
+| Recompile (editor) | Recompiles PDF from edited LaTeX (~1-3s) |
+| Save (editor) | Writes .tex + .pdf back to disk |
+| Auto-compile toggle (editor) | Recompiles automatically after 2s idle |
 
 ---
 
@@ -234,6 +245,7 @@ TheSeer/
         claude-hook/        SSE stream interceptor (MAIN world)
         popup/              Extension popup UI
         options/            Settings page
+        editor/             Live LaTeX editor + PDF preview
         scrapers/           3-tier job extraction
         shared/             Types, storage, tracker, prompt builder
       manifest.json
@@ -286,6 +298,7 @@ All logs are prefixed for easy filtering in Chrome DevTools:
 | `[Seer Claude]` | Claude automation |
 | `[Seer Hook]` | Claude response capture |
 | `[Seer Tracker]` | Dashboard tracking |
+| `[Seer Editor]` | LaTeX editor page |
 
 Filter in DevTools Console: type `[Seer` to see all extension logs.
 
