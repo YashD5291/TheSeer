@@ -228,6 +228,12 @@ async function runNativeHost() {
   try {
     const input = await readNativeMessage();
 
+    // Recompile command — write .tex and compile only
+    if (input.command === 'recompile') {
+      await handleNativeRecompile(input);
+      return;
+    }
+
     if (!input.responseText) {
       writeNativeMessage({ success: false, error: 'Missing responseText in input' });
       process.exit(0);
@@ -262,6 +268,43 @@ async function runNativeHost() {
     if (tempFile) await unlink(tempFile).catch(() => {});
     process.exit(0);
   }
+}
+
+async function handleNativeRecompile(input: any) {
+  const { texSource, texPath, folderPath, folderName } = input;
+
+  if (!texSource || !texPath || !folderPath || !folderName) {
+    writeNativeMessage({ success: false, error: 'Missing required fields for recompile' });
+    process.exit(0);
+  }
+
+  try {
+    await writeFile(texPath, texSource, 'utf-8');
+    const compiled = compilePdf(texPath, folderPath, folderName, true);
+
+    if (compiled) {
+      const pdfPath = join(folderPath, `${folderName}.pdf`);
+      const [pdfBuffer, pdfStat] = await Promise.all([
+        readFile(pdfPath),
+        stat(pdfPath),
+      ]);
+      writeNativeMessage({
+        success: true,
+        pdfBase64: pdfBuffer.toString('base64'),
+        pdfSizeBytes: pdfStat.size,
+      });
+    } else {
+      writeNativeMessage({ success: false, error: 'PDF compilation failed' });
+    }
+  } catch (err: any) {
+    writeNativeMessage({
+      success: false,
+      error: err.message || String(err),
+      compilerOutput: err.stderr?.toString() || '',
+    });
+  }
+
+  process.exit(0);
 }
 
 function readNativeMessage(): Promise<any> {

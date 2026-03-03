@@ -12,8 +12,9 @@
  * Error output:    { success: false, error: string }
  */
 
-import { execFile } from 'node:child_process';
+import { execFile, execSync } from 'node:child_process';
 import { writeFile, unlink, readFile, stat } from 'node:fs/promises';
+import { existsSync, unlinkSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -130,11 +131,85 @@ function runResumeGen(tempFile, chatTitle) {
   });
 }
 
+// Inline compile — mirrors logic from resume-gen.mjs compilePdf()
+function compilePdf(texPath, folderPath, folderName) {
+  // Try tectonic
+  try {
+    execSync('which tectonic', { stdio: 'pipe' });
+    execSync(`tectonic "${texPath}"`, { cwd: folderPath, stdio: 'pipe', timeout: 60000 });
+    return { compiled: true };
+  } catch { /* fall through to pdflatex */ }
+
+  // Fallback: pdflatex
+  try {
+    execSync('which pdflatex', { stdio: 'pipe' });
+    execSync(
+      `pdflatex -interaction=nonstopmode -halt-on-error -jobname="${folderName}" "${texPath}"`,
+      { cwd: folderPath, stdio: 'pipe', timeout: 60000 }
+    );
+    for (const ext of ['.log', '.aux', '.out']) {
+      const auxPath = join(folderPath, `${folderName}${ext}`);
+      if (existsSync(auxPath)) unlinkSync(auxPath);
+    }
+    return { compiled: true };
+  } catch (e) {
+    return { compiled: false, stderr: e.stderr?.toString() || e.message };
+  }
+}
+
+async function handleRecompile(input) {
+  const { texSource, texPath, folderPath, folderName } = input;
+
+  if (!texSource || !texPath || !folderPath || !folderName) {
+    writeMessage({ success: false, error: 'Missing required fields for recompile' });
+    process.exit(0);
+  }
+
+  try {
+    await writeFile(texPath, texSource, 'utf-8');
+
+    const { compiled, stderr } = compilePdf(texPath, folderPath, folderName);
+
+    if (compiled) {
+      const pdfPath = join(folderPath, `${folderName}.pdf`);
+      const [pdfBuffer, pdfStat] = await Promise.all([
+        readFile(pdfPath),
+        stat(pdfPath),
+      ]);
+      writeMessage({
+        success: true,
+        pdfBase64: pdfBuffer.toString('base64'),
+        pdfSizeBytes: pdfStat.size,
+      });
+    } else {
+      writeMessage({
+        success: false,
+        error: 'PDF compilation failed',
+        compilerOutput: stderr || '',
+      });
+    }
+  } catch (err) {
+    writeMessage({
+      success: false,
+      error: err.message || String(err),
+      compilerOutput: err.stderr?.toString() || '',
+    });
+  }
+
+  process.exit(0);
+}
+
 async function main() {
   let tempFile = null;
 
   try {
     const input = await readMessage();
+
+    // Recompile command — write .tex and compile only
+    if (input.command === 'recompile') {
+      await handleRecompile(input);
+      return;
+    }
 
     if (!input.responseText) {
       writeMessage({ success: false, error: 'Missing responseText in input' });

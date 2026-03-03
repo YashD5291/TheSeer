@@ -94,4 +94,26 @@ export type MessageType =
   | { type: 'SEER_PDF_READY'; pdfPath: string; folderName: string }
   | { type: 'SEER_PDF_ERROR'; error: string }
   | { type: 'SEER_OPEN_PDF'; pdfPath: string }
+  | { type: 'SEER_RECOMPILE'; texSource: string; texPath: string; folderPath: string; folderName: string }
   | { type: 'ERROR'; message: string };
+
+// Editor page types
+export interface EditorPayload {
+  pdfPath: string;
+  texPath: string;
+  folderPath: string;
+  folderName: string;
+  latexSource: string;
+  pdfBase64: string;
+  pdfSizeBytes: number;
+  jobTitle?: string;
+  jobCompany?: string;
+}
+
+export interface RecompileResponse {
+  success: boolean;
+  pdfBase64?: string;
+  pdfSizeBytes?: number;
+  error?: string;
+  compilerOutput?: string;
+}

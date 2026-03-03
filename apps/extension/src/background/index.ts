@@ -3,7 +3,7 @@ import { extractAndAnalyzeViaGrok } from '../shared/grok-client.js';
 import { buildClaudePrompt } from '../shared/prompt-builder.js';
 import { submitPromptToClaude } from '../shared/claude-client.js';
 import { trackJobCreated, trackClaudeData, trackResumeGenerated } from '../shared/tracker.js';
-import type { ScrapedJob, MessageType } from '../shared/types.js';
+import type { ScrapedJob, MessageType, EditorPayload } from '../shared/types.js';
 
 const NATIVE_HOST = 'com.theseer.resumegen';
 
@@ -19,13 +19,37 @@ chrome.runtime.onMessage.addListener((message: MessageType, sender, sendResponse
   // Toggle messages are handled by content script directly
   if ((message as any).type === 'SEER_TOGGLE') return;
 
-  // Open PDF in a new tab
+  // Open resume editor (or fallback to raw PDF)
   if ((message as any).type === 'SEER_OPEN_PDF') {
-    const pdfPath = (message as any).pdfPath as string;
-    if (pdfPath) {
-      chrome.tabs.create({ url: `file://${pdfPath}` });
+    const tabId = sender.tab?.id;
+    if (tabId) {
+      chrome.storage.session.get(`seer_editor_${tabId}`).then(data => {
+        if (data[`seer_editor_${tabId}`]) {
+          chrome.tabs.create({ url: chrome.runtime.getURL(`editor.html?tab=${tabId}`) });
+        } else {
+          const pdfPath = (message as any).pdfPath as string;
+          if (pdfPath) chrome.tabs.create({ url: `file://${pdfPath}` });
+        }
+      });
     }
     return;
+  }
+
+  // Recompile LaTeX via native host
+  if ((message as any).type === 'SEER_RECOMPILE') {
+    const { texSource, texPath, folderPath, folderName } = message as any;
+    chrome.runtime.sendNativeMessage(
+      NATIVE_HOST,
+      { command: 'recompile', texSource, texPath, folderPath, folderName },
+      (response) => {
+        if (chrome.runtime.lastError) {
+          sendResponse({ success: false, error: chrome.runtime.lastError.message });
+          return;
+        }
+        sendResponse(response);
+      }
+    );
+    return true; // keep channel open for async sendResponse
   }
 
   const tabId = sender.tab?.id;
@@ -598,8 +622,21 @@ function triggerPdfGeneration(responseText: string, chatTitle: string, jdTabId: 
             console.log(`[Seer BG] PDF notification ready: ${createdId}`);
           }
         });
+        // Store full editor payload for the editor page
+        const editorPayload: EditorPayload = {
+          pdfPath: response.pdfPath,
+          texPath: response.texPath,
+          folderPath: response.folderPath,
+          folderName: response.folderName,
+          latexSource: response.latexSource,
+          pdfBase64: response.pdfBase64,
+          pdfSizeBytes: response.pdfSizeBytes,
+          jobTitle,
+          jobCompany,
+        };
         chrome.storage.session.set({
           [`seer_notif_${notifId}`]: { pdfPath: response.pdfPath },
+          [`seer_editor_${jdTabId}`]: editorPayload,
         });
       } else {
         console.log(`[Seer BG] PDF generation failed: ${response?.error || 'unknown'}`);
@@ -614,12 +651,27 @@ function triggerPdfGeneration(responseText: string, chatTitle: string, jdTabId: 
 }
 
 chrome.notifications.onClicked.addListener(async (notifId) => {
-  const key = `seer_notif_${notifId}`;
-  const data = await chrome.storage.session.get(key);
-  const info = data[key] as { pdfPath: string } | undefined;
+  // Extract tabId from notifId format: seer-{tabId}
+  const tabId = notifId.startsWith('seer-') ? notifId.slice(5) : null;
+  const editorKey = tabId ? `seer_editor_${tabId}` : null;
+
+  if (editorKey) {
+    const data = await chrome.storage.session.get(editorKey);
+    if (data[editorKey]) {
+      chrome.tabs.create({ url: chrome.runtime.getURL(`editor.html?tab=${tabId}`) });
+      chrome.notifications.clear(notifId);
+      // Don't remove storage — editor page needs it. Session clears on browser close.
+      return;
+    }
+  }
+
+  // Fallback: old-style notification with just pdfPath
+  const notifKey = `seer_notif_${notifId}`;
+  const data = await chrome.storage.session.get(notifKey);
+  const info = data[notifKey] as { pdfPath: string } | undefined;
   if (info?.pdfPath) {
     chrome.tabs.create({ url: `file://${info.pdfPath}` });
-    await chrome.storage.session.remove(key);
+    await chrome.storage.session.remove(notifKey);
   }
   chrome.notifications.clear(notifId);
 });

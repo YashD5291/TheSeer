@@ -44,6 +44,10 @@ const entries = [
     entryPoints: ['src/options/index.ts'],
     outfile: 'dist/options.js',
   },
+  {
+    entryPoints: ['src/editor/index.ts'],
+    outfile: 'dist/editor.js',
+  },
 ];
 
 async function build() {
